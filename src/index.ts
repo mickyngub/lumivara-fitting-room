@@ -6,11 +6,13 @@ import type {
 } from "@drawdy/driver-protocol";
 import { buildCards, CARD } from "./card";
 import type { CardPayload, DriverToWebview, WebviewToDriver } from "./messages";
+import { cleanName } from "./name";
 import { WEBVIEW_HTML } from "./webview-html";
 
 const ACTION_BUTTON_SVG = `<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="#c9a45c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.4a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3v.6"/><path d="M10 9.1 2.9 13.7c-.8.5-.4 1.6.5 1.6h13.2c.9 0 1.3-1.1.5-1.6z"/></svg>`;
 const SPOT_SEARCH_RINGS = 3;
 const FLY_MS = 500;
+const PROFILE_KEY = "profile";
 
 let issue: DriverCommandIssuer;
 let driverId = "";
@@ -96,6 +98,22 @@ async function freeSpot(
   return centre;
 }
 
+async function savedName(): Promise<string> {
+  const stored = await send({
+    type: "command:kv-storage:get",
+    req: { key: PROFILE_KEY },
+  });
+  const name = stored.res.value?.got?.name;
+  return typeof name === "string" ? cleanName(name) : "";
+}
+
+async function saveName(name: string): Promise<void> {
+  await send({
+    type: "command:kv-storage:set",
+    req: { key: PROFILE_KEY, payload: { name: cleanName(name) } },
+  });
+}
+
 async function place(cards: CardPayload[]): Promise<void> {
   const width = cards.length * CARD.w + (cards.length - 1) * CARD.gap;
   const origin = await freeSpot(width, CARD.h);
@@ -172,14 +190,19 @@ export const onEvent: DriverModule["onEvent"] = async (event) => {
     case "subscription:webview:message": {
       if (event.body.webviewDomId !== webviewId) return;
       const message = event.body.message as WebviewToDriver | null;
-      if (message?.type !== "place") return;
-      try {
-        await place(message.cards);
-      } catch (err) {
-        post({
-          type: "error",
-          message: err instanceof Error ? err.message : String(err),
-        });
+      if (message?.type === "ready") {
+        post({ type: "profile", name: await savedName() });
+      } else if (message?.type === "save-name") {
+        await saveName(message.name);
+      } else if (message?.type === "place") {
+        try {
+          await place(message.cards);
+        } catch (err) {
+          post({
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
       return;
     }

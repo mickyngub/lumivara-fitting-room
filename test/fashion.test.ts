@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frameAnimation } from "../src/card";
+import { buildCards, CARD, FRAME, frameAnimation } from "../src/card";
 import { LOOKS, WING_TEXTURES, WINGS } from "../src/game/looks";
 import { createWingKit } from "../src/game/wings.js";
+import { cleanName, NAME_MAX } from "../src/name";
 
 const directionCount = 8;
 const maxKeyframes = 32;
@@ -134,5 +135,29 @@ test("each frame of a card's animation is opaque only during its own two steps",
         [frame * 2 + 1],
       );
     }
+  }
+});
+
+test("a typed character name is trimmed, single-spaced and capped at the game's 20 characters", () => {
+  assert.equal(cleanName("  Diny\u200b  the\tViking \n"), "Diny the Viking");
+  assert.equal(cleanName("สายฟ้าแลบ"), "สายฟ้าแลบ");
+  assert.equal(cleanName("a".repeat(NAME_MAX + 5)).length, NAME_MAX);
+  assert.equal(cleanName("   "), "");
+});
+
+test("card labels sit below the name tag frame and inside the card plate", () => {
+  let seq = 0;
+  const generateIdInSequence = () => String(seq++);
+  const { elements } = buildCards(
+    [{ title: "Azure Kensei", subtitle: "Kensei", frames: [new ArrayBuffer(1)], loopMs: 1 }],
+    { x: 0, y: 0 },
+    generateIdInSequence,
+  );
+  type Label = { y: number; height: number; text: string };
+  const labels = elements.filter((e) => "text" in e && e.text) as unknown as Label[];
+  assert.equal(labels.length, 3);
+  for (const label of labels) {
+    assert.ok(label.y >= CARD.pad + FRAME.h, `${label.text} overlaps the frame`);
+    assert.ok(label.y + label.height <= CARD.h - CARD.pad, `${label.text} leaves the card`);
   }
 });

@@ -4,8 +4,8 @@ import type {
 } from "@drawdy/driver-protocol";
 import type { CardPayload } from "./messages";
 
-export const FRAME = { w: 336, h: 280 };
-export const CARD = { w: 360, h: 398, gap: 32, pad: 12 };
+export const FRAME = { w: 336, h: 320 };
+export const CARD = { w: 360, h: 438, gap: 32, pad: 12 };
 export const PLATE_COLOR = "#16295a";
 
 const GOLD = "#c9a45c";
@@ -128,9 +128,10 @@ export function buildCards(
       );
     }
 
-    label(300, 34, card.title, 24, PARCHMENT);
-    label(334, 24, card.subtitle, 15, GOLD);
-    label(364, 20, FOOTER, 11, FAINT);
+    const below = CARD.pad + FRAME.h + 8;
+    label(below, 34, card.title, 24, PARCHMENT);
+    label(below + 34, 24, card.subtitle, 15, GOLD);
+    label(below + 64, 20, FOOTER, 11, FAINT);
   });
 
   return { elements, animations };

@@ -5,7 +5,12 @@ export type CardPayload = {
   loopMs: number;
 };
 
-export type WebviewToDriver = { type: "place"; cards: CardPayload[] };
+export type WebviewToDriver =
+  | { type: "ready" }
+  | { type: "save-name"; name: string }
+  | { type: "place"; cards: CardPayload[] };
 
 export type DriverToWebview =
-  { type: "placed"; count: number } | { type: "error"; message: string };
+  | { type: "profile"; name: string }
+  | { type: "placed"; count: number }
+  | { type: "error"; message: string };

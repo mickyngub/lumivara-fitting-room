@@ -6,18 +6,21 @@ import type {
   DriverToWebview,
   WebviewToDriver,
 } from "../src/messages";
+import { cleanName, NAME_MAX } from "../src/name";
+import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
 import { DIRECTIONS, FLAP_PERIOD_MS, Stage, type Backdrop } from "./stage";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
-const STAGE_NATIVE = { w: 118, h: 82, feet: { x: 59, y: 71 } };
+const STAGE_NATIVE = { w: 118, h: 88, feet: { x: 59, y: 71 } };
 const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
-const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 66 } };
+const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 65 } };
 const WALK_FRAMES = 8;
 const IDLE_FRAMES = 15;
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
+const SAVE_NAME_MS = 400;
 
 const api = acquireDrawdyApi();
 const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
@@ -37,6 +40,8 @@ let walking = false;
 let autoTurn = true;
 let lastTurn = 0;
 let busy = false;
+let playerName = "";
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 type Child = Node | string | null | false | undefined;
 
@@ -208,6 +213,22 @@ function renderLabels(): void {
   document.getElementById("pose")!.textContent = walking ? "ยืนนิ่ง" : "ลองเดิน";
 }
 
+function renderName(): void {
+  const tag = document.getElementById("name-tag")!;
+  tag.textContent = playerName;
+  tag.hidden = !playerName;
+}
+
+function onNameInput(event: Event): void {
+  playerName = cleanName((event.target as HTMLInputElement).value);
+  renderName();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(
+    () => send({ type: "save-name", name: playerName }),
+    SAVE_NAME_MS,
+  );
+}
+
 function setStatus(text: string, error = false): void {
   const node = document.getElementById("status")!;
   node.textContent = text;
@@ -234,6 +255,7 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const count = walking ? WALK_FRAMES : IDLE_FRAMES;
   const loopMs = walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
+  if (playerName) await loadNameFont(playerName);
   const frames: ArrayBuffer[] = [];
   for (let k = 0; k < count; k++) {
     const shot = await exporter.capture({
@@ -248,6 +270,7 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
+    if (playerName) drawNameTag(ctx, playerName, EXPORT_NATIVE.feet, EXPORT_SCALE);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (blob) frames.push(await blob.arrayBuffer());
   }
@@ -277,11 +300,17 @@ async function placeLooks(looks: Look[]): Promise<void> {
 }
 
 function build(): void {
-  const host = h("div", {
-    id: "stage-host",
-    role: "img",
-    "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
-  });
+  const nameTag = h("span", { id: "name-tag", class: "name-tag", hidden: true });
+  styleNameTag(nameTag, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
+  const host = h(
+    "div",
+    {
+      id: "stage-host",
+      role: "img",
+      "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
+    },
+    nameTag,
+  );
   const turn = (delta: number) => {
     autoTurn = false;
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
@@ -331,6 +360,19 @@ function build(): void {
         "ลองเดิน",
       ),
       h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
+    ),
+    h(
+      "label",
+      { class: "name-field" },
+      h("span", {}, "ชื่อตัวละคร"),
+      h("input", {
+        id: "name-input",
+        type: "text",
+        maxLength: NAME_MAX,
+        autocomplete: "off",
+        placeholder: "พิมพ์ชื่อในเกมของคุณ",
+        oninput: onNameInput,
+      }),
     ),
     h(
       "div",
@@ -455,7 +497,13 @@ function build(): void {
 
 api.onMessage((raw) => {
   const message = raw as DriverToWebview;
-  if (message.type === "placed") {
+  if (message.type === "profile") {
+    const input = document.getElementById("name-input") as HTMLInputElement;
+    if (input.value || !message.name) return;
+    playerName = cleanName(message.name);
+    input.value = playerName;
+    renderName();
+  } else if (message.type === "placed") {
     setBusy(false);
     setStatus(message.count > 1 ? `วางครบ ${message.count} ชุดแล้ว` : "วางลงบอร์ดแล้ว");
   } else if (message.type === "error") {
@@ -465,3 +513,4 @@ api.onMessage((raw) => {
 });
 
 build();
+send({ type: "ready" });
