@@ -1,0 +1,31 @@
+{
+    "name": "drawdy-lumivara-fashion",
+    "version": "0.1.0",
+    "description": "Lumivara Online fitting room for Drawdy: preview outfits and wings, then place the animated character on the board.",
+    "license": "UNLICENSED",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "snapshot": "node scripts/snapshot.mjs",
+        "dev": "vite",
+        "build": "node build.ts",
+        "test": "tsx --test test/*.test.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@drawdy/driver-protocol": "latest",
+        "@rollup/plugin-terser": "^1.0.0",
+        "@rollup/plugin-typescript": "^12.1.2",
+        "@types/node": "^24",
+        "@types/pngjs": "^6.0.5",
+        "acorn": "^8.14.0",
+        "eslint-scope": "^8.2.0",
+        "fflate": "^0.8.2",
+        "pngjs": "^7.0.0",
+        "rollup": "^4.34.0",
+        "tslib": "^2.8.1",
+        "tsx": "^4.20.0",
+        "typescript": "^5",
+        "vite": "^8.2.1"
+    }
+}

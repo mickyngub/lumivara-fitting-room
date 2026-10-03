@@ -1,0 +1,8 @@
+{
+    "driverId": "drawdy.lumivara-fashion",
+    "driverName": "Lumivara Fitting Room",
+    "driverVersion": "0.1.0",
+    "description": "ลองชุดแฟชั่นและปีกของ Lumivara Online บนตัวละครที่เดินได้จริง แล้ววางลงบอร์ดเป็นการ์ดตัวละครเคลื่อนไหว",
+    "main": "main.js",
+    "permissions": ["dom", "scene"]
+}
