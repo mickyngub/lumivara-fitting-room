@@ -199,13 +199,6 @@ h2 {
     scrollbar-color: var(--gold-dark) transparent;
 }
 
-.divider {
-    flex: none;
-    width: 1px;
-    margin: 6px 2px;
-    background: var(--gold-dark);
-}
-
 .look {
     position: relative;
     flex: none;
@@ -227,7 +220,8 @@ h2 {
     border-color: var(--gold-dark);
 }
 
-.look[aria-pressed="true"] {
+.look[aria-pressed="true"],
+.fashion .look[aria-pressed="true"] {
     border-color: var(--gold);
     box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
 }
@@ -261,6 +255,27 @@ h2 {
     font-style: normal;
     font-weight: 700;
     white-space: nowrap;
+}
+
+.fashion {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+}
+
+.fashion .look {
+    width: 84px;
+}
+
+.empty {
+    flex: 1;
+    min-width: 140px;
+    margin: 0;
+    align-self: center;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.5;
 }
 
 .wings {

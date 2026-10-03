@@ -15,6 +15,7 @@ export type Look = {
   className: string;
   name: string;
   description: string;
+  source?: string;
   sheet: Sheet;
 };
 

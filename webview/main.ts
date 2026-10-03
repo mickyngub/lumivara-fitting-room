@@ -25,7 +25,12 @@ const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
 const stage = new Stage();
 const root = document.getElementById("root")!;
 
-let lookId = LOOKS[0].id;
+const CLASS_LOOKS = LOOKS.filter((l) => l.kind === "class");
+const OUTFITS = LOOKS.filter((l) => l.kind === "outfit");
+const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === classId);
+
+let classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
+let outfitId: string | null = OUTFITS[0]?.id ?? null;
 let wingsId: string | null = WINGS[0]?.id ?? null;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let walking = false;
@@ -55,13 +60,13 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const look = (): Look => LOOKS.find((l) => l.id === lookId) ?? LOOKS[0];
+const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
+const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
 const wing = () => WINGS.find((w) => w.id === wingsId) ?? null;
 const png = (b64: string) => `data:image/png;base64,${b64}`;
 
 function subtitleFor(l: Look): string {
-  const base =
-    l.kind === "outfit" ? `ชุดแฟชั่น ${l.className}` : `ชุดปกติ ${l.className}`;
+  const base = `${l.className} · ${l.kind === "outfit" ? "ชุดแฟชั่น" : "ชุดปกติ"}`;
   const w = wing();
   return w ? `${base} · ${w.name}` : base;
 }
@@ -101,27 +106,84 @@ function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.stroke();
 }
 
+function pick(tile: Look, label: string, pressed: boolean, onclick: () => void, badge?: string) {
+  return h(
+    "button",
+    { type: "button", class: "look", title: tile.name, "aria-pressed": String(pressed), onclick },
+    thumb(tile, 56),
+    h("span", { class: "look-name" }, label),
+    badge && h("em", {}, badge),
+  );
+}
+
+function renderClasses(): void {
+  document.getElementById("classes")!.replaceChildren(
+    ...CLASS_LOOKS.map((c) =>
+      pick(
+        c,
+        c.className,
+        c.classId === classId,
+        () => {
+          classId = c.classId;
+          outfitId = null;
+          renderPickers();
+        },
+        outfitsOf(c.classId).length ? "มีชุด" : undefined,
+      ),
+    ),
+  );
+}
+
+function renderFashion(): void {
+  const plain = plainLook();
+  const outfits = outfitsOf(classId);
+  const withOutfits = [...new Set(OUTFITS.map((o) => o.className))].join(", ");
+  document.getElementById("fashion")!.replaceChildren(
+    pick(plain, "ชุดปกติ", outfitId === null, () => {
+      outfitId = null;
+      renderPickers();
+    }),
+    ...outfits.map((o) =>
+      pick(
+        o,
+        o.name,
+        outfitId === o.id,
+        () => {
+          outfitId = o.id;
+          renderPickers();
+        },
+        "แฟชั่น",
+      ),
+    ),
+    ...(outfits.length
+      ? []
+      : [
+          h(
+            "p",
+            { class: "empty" },
+            `${plain.className} ยังไม่มีชุดแฟชั่นในเกม`,
+            h("br"),
+            `ตอนนี้มีให้ ${withOutfits}`,
+          ),
+        ]),
+  );
+}
+
+function renderPickers(): void {
+  renderClasses();
+  renderFashion();
+  renderLabels();
+}
+
 function renderLabels(): void {
   const l = look();
   document.getElementById("look-name")!.textContent = l.name;
   document.getElementById("look-sub")!.textContent = subtitleFor(l);
-  document.getElementById("look-desc")!.textContent =
-    l.description || wing()?.description || "";
-  document
-    .querySelectorAll<HTMLElement>("[data-look]")
-    .forEach((n) =>
-      n.setAttribute("aria-pressed", String(n.dataset.look === lookId)),
-    );
+  document.getElementById("look-desc")!.textContent = l.description || wing()?.description || "";
   document
     .querySelectorAll<HTMLElement>("[data-wings]")
-    .forEach((n) =>
-      n.setAttribute(
-        "aria-pressed",
-        String((n.dataset.wings || null) === wingsId),
-      ),
-    );
-  const pose = document.getElementById("pose")!;
-  pose.textContent = walking ? "ยืนนิ่ง" : "ลองเดิน";
+    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.wings || null) === wingsId)));
+  document.getElementById("pose")!.textContent = walking ? "ยืนนิ่ง" : "ลองเดิน";
 }
 
 function setStatus(text: string, error = false): void {
@@ -206,30 +268,6 @@ function build(): void {
     autoTurn = false;
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
-  const outfits = LOOKS.filter((l) => l.kind === "outfit");
-  const classes = LOOKS.filter((l) => l.kind === "class");
-  const lookTile = (l: Look) =>
-    h(
-      "button",
-      {
-        type: "button",
-        class: `look${l.kind === "outfit" ? " fashion" : ""}`,
-        "data-look": l.id,
-        title: l.name,
-        onclick: () => {
-          lookId = l.id;
-          renderLabels();
-        },
-      },
-      thumb(l, 56),
-      h(
-        "span",
-        { class: "look-name" },
-        l.kind === "outfit" ? l.name : l.className,
-      ),
-      l.kind === "outfit" && h("em", {}, "แฟชั่น"),
-    );
-
   root.replaceChildren(
     h(
       "header",
@@ -283,14 +321,10 @@ function build(): void {
       h("span", { id: "look-sub" }),
       h("p", { id: "look-desc" }),
     ),
-    h("h2", {}, "ชุด"),
-    h(
-      "div",
-      { class: "looks", role: "radiogroup", "aria-label": "ชุด" },
-      ...outfits.map(lookTile),
-      h("span", { class: "divider" }),
-      ...classes.map(lookTile),
-    ),
+    h("h2", {}, "อาชีพ"),
+    h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }),
+    h("h2", {}, "ชุดแฟชั่น"),
+    h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }),
     h("h2", {}, "ปีก"),
     h(
       "div",
@@ -346,8 +380,8 @@ function build(): void {
       ),
       h(
         "button",
-        { type: "button", class: "link", onclick: () => placeLooks(outfits) },
-        `วางชุดแฟชั่นครบ ${outfits.length} ชุดเรียงกัน`,
+        { type: "button", class: "link", onclick: () => placeLooks(OUTFITS) },
+        `วางชุดแฟชั่นทั้งหมด ${OUTFITS.length} ชุดเรียงกัน`,
       ),
       h("p", { id: "status", class: "status", role: "status" }),
     ),
@@ -370,7 +404,7 @@ function build(): void {
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
-  renderLabels();
+  renderPickers();
   startStage(canvas);
 }
 

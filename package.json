@@ -7,6 +7,7 @@
     "type": "module",
     "scripts": {
         "snapshot": "node scripts/snapshot.mjs",
+        "check-art": "node scripts/snapshot.mjs --check",
         "dev": "vite",
         "build": "node build.ts",
         "test": "tsx --test test/*.test.ts",

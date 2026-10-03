@@ -1,6 +1,6 @@
 # Lumivara Fitting Room (Drawdy extension)
 
-Try Lumivara Online's fashion items on a live character, then put it on the board. Pick a look (the five fashion outfits or any class's plain look) and wings (none, Divine, Demon). The preview turns by itself; drag it or use the arrows to turn it, and tap "ลองเดิน" to see it walk. "วางลงบอร์ด" stamps an animated character card. The link under it places all five outfits in a row.
+Try Lumivara Online's fashion items on a live character, then put it on the board. Pick a class, then that class's fashion (its plain look or an outfit made for it; outfits are class-bound in the game), then wings (none, Divine, Demon). The preview turns by itself; drag it or use the arrows to turn it, and tap "ลองเดิน" to see it walk. "วางลงบอร์ด" stamps an animated character card. The link under it places every outfit in a row.
 
 ## Where it comes from
 
@@ -12,6 +12,7 @@ Try Lumivara Online's fashion items on a live character, then put it on the boar
 
 ```bash
 npm install
+npm run check-art  # compare the bundled art and wing code with the live game, item by item
 npm run snapshot   # re-download looks, wings and the wing code after a game update
 npm test
 npm run dev        # dev server on :5182; in Drawdy run ⌘K → "Add extension dev server" on a local board
