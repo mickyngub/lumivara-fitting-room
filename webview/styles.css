@@ -98,8 +98,11 @@ button:disabled {
         0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
+/* An always-on scrollbar can make the stage narrower than the canvas, so the
+   canvas is centred and overflows both sides equally. */
 #stage-host {
-    position: relative;
+    display: flex;
+    justify-content: center;
     touch-action: none;
     cursor: grab;
 }
@@ -111,6 +114,11 @@ button:disabled {
 #stage-host canvas {
     display: block;
     image-rendering: pixelated;
+}
+
+.stage-frame {
+    position: relative;
+    flex: none;
 }
 
 .name-tag {

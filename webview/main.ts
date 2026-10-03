@@ -302,6 +302,7 @@ async function placeLooks(looks: Look[]): Promise<void> {
 function build(): void {
   const nameTag = h("span", { id: "name-tag", class: "name-tag", hidden: true });
   styleNameTag(nameTag, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
+  const canvasFrame = h("div", { class: "stage-frame" }, nameTag);
   const host = h(
     "div",
     {
@@ -309,7 +310,7 @@ function build(): void {
       role: "img",
       "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
     },
-    nameTag,
+    canvasFrame,
   );
   const turn = (delta: number) => {
     autoTurn = false;
@@ -450,7 +451,7 @@ function build(): void {
 
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const live = new Stage({
-    parent: host,
+    parent: canvasFrame,
     width: STAGE_NATIVE.w,
     height: STAGE_NATIVE.h,
     feet: STAGE_NATIVE.feet,
