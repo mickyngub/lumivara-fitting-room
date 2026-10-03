@@ -9,6 +9,8 @@ const BODY_DEPTH = 10;
 // The game's player shadow: add.ellipse(x, feet, 25, 9, 0x122018, 0.4).
 const SHADOW = { w: 25, h: 9, color: 0x122018, alpha: 0.4 };
 const BACKDROP_DEPTH = -1e6;
+// Rows above the baseline (the feet) that the wings attach to.
+const TORSO_BAND = { top: 26, bottom: 16 };
 // The game's flap is sin(t / 130) walking and sin(t / 420) standing.
 export const FLAP_PERIOD_MS = {
   walk: 2 * Math.PI * 130,
@@ -56,9 +58,8 @@ const png = (b64: string) => `data:image/png;base64,${b64}`;
 export class Stage {
   readonly ready: Promise<void>;
   private body!: Phaser.GameObjects.Sprite;
-  private camera!: Phaser.Cameras.Scene2D.Camera;
   private textures!: Phaser.Textures.TextureManager;
-  private readonly bodyCentres = new Map<string, Map<string, number>>();
+  private readonly torsoOffsets = new Map<string, Map<string, number>>();
   private entity!: Record<string, any>;
   private readonly clock = { now: 0 };
   private wingsId: string | null = null;
@@ -87,12 +88,7 @@ export class Stage {
         const texture = this.textures.createCanvas("backdrop", width, height)!;
         backdrop(texture.getContext(), width, height, feet);
         texture.refresh();
-        this.add
-          .image(0, 0, "backdrop")
-          .setOrigin(0)
-          .setDepth(BACKDROP_DEPTH)
-          .setScrollFactor(0);
-        stage.camera = this.cameras.main;
+        this.add.image(0, 0, "backdrop").setOrigin(0).setDepth(BACKDROP_DEPTH);
         stage.textures = this.textures;
         const groundY = feet.y - FEET_OFFSET;
         this.add
@@ -161,14 +157,14 @@ export class Stage {
     return this.game.canvas;
   }
 
-  // Sprite art is often off-centre in its cell (a sword out to one side), so
-  // the camera frames the body's alpha-weighted centre instead of the anchor.
-  // Wings and shadow hang off the anchor and keep the game's placement.
-  private bodyCentre(look: Look, direction: string): number {
-    let byDirection = this.bodyCentres.get(look.id);
+  // The game hangs wings, shadow and name off the frame centre, but many sprites
+  // draw the torso off-centre in the frame. Unlike the game, the preview shifts
+  // the body so its torso band sits on that anchor (see the wing-anchor note).
+  private torsoOffset(look: Look, direction: string): number {
+    let byDirection = this.torsoOffsets.get(look.id);
     if (!byDirection) {
       byDirection = new Map();
-      const { cell, rows } = look.sheet;
+      const { cell, rows, baseline } = look.sheet;
       const source = this.textures
         .get(look.id)
         .getSourceImage() as HTMLImageElement;
@@ -183,26 +179,28 @@ export class Stage {
         source.width,
         source.height,
       );
-      const sums = new Map<string, { mass: number; moment: number }>();
       rows.forEach((row, r) => {
-        if (row.anim !== "idle" && row.anim !== "walk") return;
-        const sum = sums.get(row.dir) ?? { mass: 0, moment: 0 };
-        for (let f = 0; f < row.count; f++) {
-          for (let y = 0; y < cell.h; y++) {
-            for (let x = 0; x < cell.w; x++) {
-              const alpha =
-                data[((r * cell.h + y) * width + f * cell.w + x) * 4 + 3];
-              sum.mass += alpha;
-              sum.moment += alpha * (x + 0.5);
+        if (row.anim !== "idle") return;
+        let min = cell.w;
+        let max = -1;
+        for (
+          let y = baseline - TORSO_BAND.top;
+          y <= baseline - TORSO_BAND.bottom;
+          y++
+        ) {
+          for (let x = 0; x < cell.w; x++) {
+            if (data[((r * cell.h + y) * width + x) * 4 + 3]) {
+              min = Math.min(min, x);
+              max = Math.max(max, x);
             }
           }
         }
-        sums.set(row.dir, sum);
+        byDirection!.set(
+          row.dir,
+          max < 0 ? 0 : Math.round((min + max + 1) / 2 - cell.w / 2),
+        );
       });
-      for (const [dir, { mass, moment }] of sums) {
-        byDirection.set(dir, mass ? Math.round(moment / mass - cell.w / 2) : 0);
-      }
-      this.bodyCentres.set(look.id, byDirection);
+      this.torsoOffsets.set(look.id, byDirection);
     }
     return byDirection.get(direction) ?? 0;
   }
@@ -231,9 +229,8 @@ export class Stage {
     this.body
       .setTexture(look.id, rowIndex * cols + frame)
       .setOrigin(0.5, baseline / cell.h)
-      .setPosition(feet.x, feet.y);
+      .setPosition(feet.x - this.torsoOffset(look, pose.direction), feet.y);
     this.entity.drawWings({ visible: true, y: feet.y - FEET_OFFSET });
-    this.camera.scrollX = this.bodyCentre(look, pose.direction);
   }
 
   /** Renders one scene and resolves with the frame the game drew. */
