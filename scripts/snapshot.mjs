@@ -52,10 +52,18 @@ const canonicalCode = (source) => {
     return out + code.slice(last);
 };
 
+const FETCH_ATTEMPTS = 3;
 const fetchOk = async (path) => {
-    const res = await fetch(ORIGIN + path, { headers: { "user-agent": UA } });
-    if (!res.ok) throw new Error(`GET ${path}: HTTP ${res.status}`);
-    return res;
+    for (let attempt = 1; ; attempt++) {
+        const res = await fetch(ORIGIN + path, { headers: { "user-agent": UA } }).catch((err) => err);
+        if (res instanceof Response && (res.ok || res.status === 404)) {
+            if (!res.ok) throw new Error(`GET ${path}: HTTP 404`);
+            return res;
+        }
+        if (attempt === FETCH_ATTEMPTS) {
+            throw new Error(`GET ${path}: ${res instanceof Response ? `HTTP ${res.status}` : res.message}`);
+        }
+    }
 };
 const getText = async (path) => (await fetchOk(path)).text();
 const getBytes = async (path) => Buffer.from(await (await fetchOk(path)).arrayBuffer());
@@ -359,8 +367,9 @@ const itemIcons = {};
 for (const id of new Set([...Object.keys(cosmetics), ...wings.map((w) => w.id), ...wingItems])) {
     try {
         itemIcons[id] = (await getBytes(`/items/${id}.png`)).toString("base64");
-    } catch {
+    } catch (err) {
         // A missing shop icon only costs the tile its picture.
+        if (!String(err.message).endsWith("HTTP 404")) throw err;
     }
 }
 
@@ -384,7 +393,9 @@ if (CHECK) {
     const sameTable = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     if (!sameTable(disk.WINGS, wings)) problems.push("wing list or descriptions changed");
     if (!sameTable(disk.WING_TEXTURES, wingTextures)) problems.push("wing art changed");
-    if (!sameTable(disk.ITEM_ICONS, itemIcons)) problems.push("shop icons changed");
+    const iconIds = new Set([...Object.keys(disk.ITEM_ICONS), ...Object.keys(itemIcons)]);
+    const changedIcons = [...iconIds].filter((id) => disk.ITEM_ICONS[id] !== itemIcons[id]);
+    if (changedIcons.length) problems.push(`shop icons changed: ${changedIcons.join(", ")}`);
     if (canonicalCode(readFileSync(join(GAME_DIR, "wings.js"), "utf8")) !== canonicalCode(wingSource)) {
         problems.push("wing animation code changed");
     }
