@@ -19,6 +19,39 @@ const MAX_EXTRACTED_BYTES = 40_000;
 // with the bundled files instead of writing them.
 const CHECK = process.argv.includes("--check");
 
+// Minifiers rename variables on every deploy; renaming them canonically (by
+// first appearance) leaves only real changes, while property names and
+// literals stay as they are.
+const canonicalCode = (source) => {
+    const code = source.replace(/^\/\/.*\n/, "");
+    const tree = acorn.parse(code, { ecmaVersion: "latest", sourceType: "module", ranges: true });
+    const ids = [];
+    (function walk(node, parent, key) {
+        if (!node || typeof node.type !== "string") return;
+        if (node.type === "Identifier") {
+            const member = parent?.type === "MemberExpression" && key === "property" && !parent.computed;
+            const propKey =
+                (parent?.type === "Property" || parent?.type === "MethodDefinition") && key === "key" && !parent.computed;
+            if (!member && !propKey) ids.push(node);
+        }
+        for (const k of Object.keys(node)) {
+            if (node.type === "Property" && node.shorthand && k === "key") continue;
+            const child = node[k];
+            if (Array.isArray(child)) child.forEach((c) => walk(c, node, k));
+            else if (child && typeof child.type === "string") walk(child, node, k);
+        }
+    })(tree, null, null);
+    const names = new Map();
+    let out = "";
+    let last = 0;
+    for (const id of ids.sort((a, b) => a.range[0] - b.range[0])) {
+        if (!names.has(id.name)) names.set(id.name, `$${names.size}`);
+        out += code.slice(last, id.range[0]) + names.get(id.name);
+        last = id.range[1];
+    }
+    return out + code.slice(last);
+};
+
 const fetchOk = async (path) => {
     const res = await fetch(ORIGIN + path, { headers: { "user-agent": UA } });
     if (!res.ok) throw new Error(`GET ${path}: HTTP ${res.status}`);
@@ -264,16 +297,27 @@ const packSheet = (atlasJson, atlasPng) => {
     };
 };
 
+// "All fashion" means everything the game client can draw, not only what the
+// shop lists: outfits come from the atlas table, wings from the wing code.
+const itemText = (id) => {
+    if (cosmetics[id]) return cosmetics[id];
+    for (const table of Object.values(G)) {
+        if (isObj(table) && isObj(table[id]) && typeof table[id].name === "string") return table[id];
+    }
+    return { name: id, description: "" };
+};
+const outfitIds = [...new Set([...Object.keys(outfitAtlas), ...Object.keys(cosmetics).filter((id) => cosmetics[id].slot === "outfit")])];
+const unplaceableOutfits = outfitIds.filter((id) => !outfitAtlas[id] || !cosmetics[id]?.classId);
 const lookSources = [
-    ...Object.entries(cosmetics)
-        .filter(([, c]) => c.slot === "outfit")
-        .map(([id, c]) => ({
+    ...outfitIds
+        .filter((id) => !unplaceableOutfits.includes(id))
+        .map((id) => ({
             id: `outfit:${id}`,
             kind: "outfit",
             itemId: id,
-            classId: c.classId,
-            name: c.name,
-            description: c.description ?? "",
+            classId: cosmetics[id].classId,
+            name: itemText(id).name,
+            description: itemText(id).description ?? "",
             path: outfitAtlas[id],
         })),
     ...Object.entries(classNames).map(([classId, name]) => ({
@@ -302,11 +346,17 @@ for (const style of Object.values(kit.config)) {
     wingTextures[style.texture] = (await getBytes(style.url)).toString("base64");
     if (style.rim && style.rimUrl) wingTextures[style.rim] = (await getBytes(style.rimUrl)).toString("base64");
 }
-const wings = Object.entries(cosmetics)
-    .filter(([id, c]) => c.slot === "wings" && kit.config[id])
-    .map(([id, c]) => ({ id, name: c.name, description: c.description ?? "" }));
+const wings = Object.keys(kit.config).map((id) => ({
+    id,
+    name: itemText(id).name,
+    description: itemText(id).description ?? "",
+}));
+// Items the game's wing menu offers (its chat badge table lists them); any
+// without a style in the wing code have no art in this build yet.
+const wingItems = [...mainCode.matchAll(/([a-z0-9_]+):\{icon:"\/items\/\1\.png",title:/g)].map((m) => m[1]);
+const wingsWithoutArt = wingItems.filter((id) => !kit.config[id]).map((id) => `${id} (${itemText(id).name})`);
 const itemIcons = {};
-for (const id of Object.keys(cosmetics)) {
+for (const id of new Set([...Object.keys(cosmetics), ...wings.map((w) => w.id), ...wingItems])) {
     try {
         itemIcons[id] = (await getBytes(`/items/${id}.png`)).toString("base64");
     } catch {
@@ -335,10 +385,11 @@ if (CHECK) {
     if (!sameTable(disk.WINGS, wings)) problems.push("wing list or descriptions changed");
     if (!sameTable(disk.WING_TEXTURES, wingTextures)) problems.push("wing art changed");
     if (!sameTable(disk.ITEM_ICONS, itemIcons)) problems.push("shop icons changed");
-    const body = (code) => code.slice(code.indexOf("\n") + 1);
-    if (body(readFileSync(join(GAME_DIR, "wings.js"), "utf8")) !== body(wingSource)) {
+    if (canonicalCode(readFileSync(join(GAME_DIR, "wings.js"), "utf8")) !== canonicalCode(wingSource)) {
         problems.push("wing animation code changed");
     }
+    const gaps = [...wingsWithoutArt, ...unplaceableOutfits.map((id) => `${id} (outfit without art or class)`)];
+    if (gaps.length) console.log(`In the game without art in this build (not bundled): ${gaps.join(", ")}`);
     if (problems.length) {
         console.log(`Art is out of date with ${mainChunk}:\n  ${problems.join("\n  ")}\nRun npm run snapshot.`);
         process.exit(1);
@@ -374,6 +425,8 @@ console.log(
             wingBytes: wingSource.length,
             looks: looks.map((l) => `${l.id} ${l.source} ${l.sheet.cell.w}x${l.sheet.cell.h}`),
             wings: wings.map((w) => w.id),
+            wingsWithoutArt,
+            unplaceableOutfits,
             icons: Object.keys(itemIcons),
         },
         null,

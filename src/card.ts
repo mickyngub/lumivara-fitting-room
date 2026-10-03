@@ -4,7 +4,7 @@ import type {
 } from "@drawdy/driver-protocol";
 import type { CardPayload } from "./messages";
 
-export const FRAME = { w: 336, h: 282 };
+export const FRAME = { w: 336, h: 280 };
 export const CARD = { w: 360, h: 398, gap: 32, pad: 12 };
 export const PLATE_COLOR = "#16295a";
 

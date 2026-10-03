@@ -6,13 +6,13 @@ import type {
   DriverToWebview,
   WebviewToDriver,
 } from "../src/messages";
-import { DIRECTIONS, FLAP_PERIOD_MS, Stage } from "./stage";
+import { DIRECTIONS, FLAP_PERIOD_MS, Stage, type Backdrop } from "./stage";
 
-const STAGE_CSS = { w: 296, h: 206 };
+// Native game pixels; CSS scales the canvas up the way the game scales its own.
+const STAGE_NATIVE = { w: 118, h: 82, feet: { x: 59, y: 71 } };
 const STAGE_SCALE_CSS = 2.5;
-const STAGE_FEET_FROM_BOTTOM_CSS = 28;
 const EXPORT_SCALE = 4;
-const EXPORT_FEET = { x: FRAME.w / EXPORT_SCALE / 2, y: 66 };
+const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 66 } };
 const WALK_FRAMES = 8;
 const IDLE_FRAMES = 15;
 const AUTO_TURN_MS = 1400;
@@ -22,7 +22,7 @@ const THUMB_ROW = { anim: "idle", dir: "south" };
 const api = acquireDrawdyApi();
 const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
   api.postMessage(message, transfer);
-const stage = new Stage();
+let exporter: Stage | null = null;
 const root = document.getElementById("root")!;
 
 const CLASS_LOOKS = LOOKS.filter((l) => l.kind === "class");
@@ -91,20 +91,42 @@ function thumb(l: Look, size: number): HTMLElement {
   });
 }
 
-function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  const glow = ctx.createRadialGradient(x, y, 2, x, y, 30);
+function drawFloor(ctx: CanvasRenderingContext2D, feet: { x: number; y: number }): void {
+  const glow = ctx.createRadialGradient(feet.x, feet.y, 2, feet.x, feet.y, 30);
   glow.addColorStop(0, "rgba(255, 233, 166, 0.22)");
   glow.addColorStop(1, "rgba(255, 233, 166, 0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(x, y, 30, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(feet.x, feet.y, 30, 9, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(201, 164, 92, 0.6)";
-  ctx.lineWidth = 0.6;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.ellipse(x, y, 24, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(feet.x, feet.y, 24, 7, 0, 0, Math.PI * 2);
   ctx.stroke();
 }
+
+const stageBackdrop: Backdrop = (ctx, width, height, feet) => {
+  const sky = ctx.createRadialGradient(width / 2, height * 0.75, 4, width / 2, height * 0.75, width * 0.8);
+  sky.addColorStop(0, "#2a4688");
+  sky.addColorStop(0.55, "#16295a");
+  sky.addColorStop(1, "#0b1a3a");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "rgba(255, 233, 166, 0.5)";
+  for (const [x, y] of [[0.18, 0.2], [0.82, 0.14], [0.7, 0.38], [0.3, 0.44], [0.9, 0.55]]) {
+    ctx.fillRect(Math.round(x * width), Math.round(y * height), 1, 1);
+  }
+  drawFloor(ctx, feet);
+};
+
+// The card plate's colour is baked into every frame so a frame fully covers
+// the ones beneath it whenever the board draws without animation.
+const cardBackdrop: Backdrop = (ctx, width, height, feet) => {
+  ctx.fillStyle = PLATE_COLOR;
+  ctx.fillRect(0, 0, width, height);
+  drawFloor(ctx, feet);
+};
 
 function pick(tile: Look, label: string, pressed: boolean, onclick: () => void, badge?: string) {
   return h(
@@ -199,39 +221,34 @@ function setBusy(next: boolean): void {
     .forEach((b) => (b.disabled = next));
 }
 
-async function exportFrames(
-  l: Look,
-): Promise<{ frames: ArrayBuffer[]; loopMs: number }> {
+async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: number }> {
+  exporter ??= new Stage({
+    parent: document.getElementById("exporter")!,
+    width: EXPORT_NATIVE.w,
+    height: EXPORT_NATIVE.h,
+    feet: EXPORT_NATIVE.feet,
+    looks: LOOKS,
+    wingTextures: WING_TEXTURES,
+    backdrop: cardBackdrop,
+  });
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const count = walking ? WALK_FRAMES : IDLE_FRAMES;
   const loopMs = walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
   const frames: ArrayBuffer[] = [];
   for (let k = 0; k < count; k++) {
+    const shot = await exporter.capture({
+      look: l,
+      wings: wingsId,
+      pose: { direction, walking },
+      timeMs: (k * loopMs) / count,
+    });
     const canvas = document.createElement("canvas");
     canvas.width = FRAME.w;
     canvas.height = FRAME.h;
     const ctx = canvas.getContext("2d")!;
-    // The card plate's colour is baked in so a frame fully covers the ones
-    // beneath it whenever the board draws without animation.
-    ctx.fillStyle = PLATE_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
-    ctx.setTransform(EXPORT_SCALE, 0, 0, EXPORT_SCALE, 0, 0);
-    drawFloor(ctx, EXPORT_FEET.x, EXPORT_FEET.y);
-    stage.draw(
-      ctx,
-      {
-        look: l,
-        wings: wingsId,
-        pose: { direction, walking },
-        timeMs: (k * loopMs) / count,
-      },
-      EXPORT_FEET.x,
-      EXPORT_FEET.y,
-    );
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/png"),
-    );
+    ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (blob) frames.push(await blob.arrayBuffer());
   }
   return { frames, loopMs };
@@ -260,8 +277,9 @@ async function placeLooks(looks: Look[]): Promise<void> {
 }
 
 function build(): void {
-  const canvas = h("canvas", {
-    id: "stage-canvas",
+  const host = h("div", {
+    id: "stage-host",
+    role: "img",
     "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
   });
   const turn = (delta: number) => {
@@ -278,7 +296,7 @@ function build(): void {
     h(
       "div",
       { class: "stage" },
-      canvas,
+      host,
       h(
         "button",
         {
@@ -385,14 +403,42 @@ function build(): void {
       ),
       h("p", { id: "status", class: "status", role: "status" }),
     ),
+    h("div", { id: "exporter", class: "exporter", "aria-hidden": "true" }),
   );
 
-  let dragX: number | null = null;
-  canvas.addEventListener("pointerdown", (e) => {
-    dragX = e.clientX;
-    canvas.setPointerCapture(e.pointerId);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const live = new Stage({
+    parent: host,
+    width: STAGE_NATIVE.w,
+    height: STAGE_NATIVE.h,
+    feet: STAGE_NATIVE.feet,
+    looks: LOOKS,
+    wingTextures: WING_TEXTURES,
+    backdrop: stageBackdrop,
+    frame: (now) => {
+      if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
+        dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
+        lastTurn = now;
+      }
+      return {
+        look: look(),
+        wings: wingsId,
+        pose: { direction: DIRECTIONS[dirIndex], walking },
+        timeMs: reduced ? 0 : now,
+      };
+    },
   });
-  canvas.addEventListener("pointermove", (e) => {
+  void live.ready.then(() => {
+    live.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
+    live.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
+  });
+
+  let dragX: number | null = null;
+  host.addEventListener("pointerdown", (e) => {
+    dragX = e.clientX;
+    host.setPointerCapture(e.pointerId);
+  });
+  host.addEventListener("pointermove", (e) => {
     if (dragX === null) return;
     const dx = e.clientX - dragX;
     if (Math.abs(dx) >= DRAG_STEP_PX) {
@@ -401,66 +447,21 @@ function build(): void {
     }
   });
   const endDrag = () => (dragX = null);
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
+  host.addEventListener("pointerup", endDrag);
+  host.addEventListener("pointercancel", endDrag);
 
   renderPickers();
-  startStage(canvas);
-}
-
-function startStage(canvas: HTMLCanvasElement): void {
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.round(STAGE_CSS.w * dpr);
-  canvas.height = Math.round(STAGE_CSS.h * dpr);
-  canvas.style.width = `${STAGE_CSS.w}px`;
-  canvas.style.height = `${STAGE_CSS.h}px`;
-  const scale = Math.max(2, Math.round(STAGE_SCALE_CSS * dpr));
-  const ctx = canvas.getContext("2d")!;
-  const feet = {
-    x: canvas.width / scale / 2,
-    y: (canvas.height - STAGE_FEET_FROM_BOTTOM_CSS * dpr) / scale,
-  };
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const tick = (now: number) => {
-    if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
-      dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
-      lastTurn = now;
-    }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.imageSmoothingEnabled = false;
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    drawFloor(ctx, feet.x, feet.y);
-    stage.draw(
-      ctx,
-      {
-        look: look(),
-        wings: wingsId,
-        pose: { direction: DIRECTIONS[dirIndex], walking },
-        timeMs: reduced ? 0 : now,
-      },
-      feet.x,
-      feet.y,
-    );
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
 }
 
 api.onMessage((raw) => {
   const message = raw as DriverToWebview;
   if (message.type === "placed") {
     setBusy(false);
-    setStatus(
-      message.count > 1 ? `วางครบ ${message.count} ชุดแล้ว` : "วางลงบอร์ดแล้ว",
-    );
+    setStatus(message.count > 1 ? `วางครบ ${message.count} ชุดแล้ว` : "วางลงบอร์ดแล้ว");
   } else if (message.type === "error") {
     setBusy(false);
     setStatus(message.message, true);
   }
 });
 
-root.replaceChildren(h("p", { class: "boot" }, "กำลังเปิดห้องแต่งตัว…"));
-stage.load(LOOKS, WING_TEXTURES).then(build, (err) => {
-  root.replaceChildren(h("p", { class: "boot" }, `โหลดไม่สำเร็จ: ${err}`));
-});
+build();

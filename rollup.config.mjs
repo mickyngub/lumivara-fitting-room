@@ -11,11 +11,16 @@ function webviewHtml() {
         name: "webview-html",
         writeBundle() {
             const css = readFileSync(join(root, "webview", "styles.css"), "utf8");
+            // The game's own engine, inlined so the sandboxed webview needs no network.
+            const phaser = readFileSync(join(root, "node_modules", "phaser", "dist", "phaser.min.js"), "utf8").replaceAll(
+                "</script",
+                "<\\/script"
+            );
             const js = readFileSync(join(root, "dist", "webview.js"), "utf8").replaceAll(
                 "</script",
                 "<\\/script"
             );
-            const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>:root{/*__DRAWDY_STYLING__*/}</style><style id="drawdy-vars"></style><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>`;
+            const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><style>:root{/*__DRAWDY_STYLING__*/}</style><style id="drawdy-vars"></style><style>${css}</style></head><body><div id="root"></div><script>${phaser}</script><script>${js}</script></body></html>`;
             // Committed because the publishing service builds src/index.ts with
             // esbuild and runs no bundler plugins.
             const out = join(root, "src", "webview-html.ts");
