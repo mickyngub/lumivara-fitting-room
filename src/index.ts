@@ -98,7 +98,7 @@ async function freeSpot(
   return centre;
 }
 
-type Profile = { name: string; background?: string };
+type Profile = { name: string; background?: string; frame?: string };
 let profile: Profile = { name: "" };
 
 async function loadProfile(): Promise<Profile> {
@@ -110,6 +110,7 @@ async function loadProfile(): Promise<Profile> {
   profile = {
     name: typeof got.name === "string" ? cleanName(got.name) : "",
     ...(typeof got.background === "string" ? { background: got.background } : {}),
+    ...(typeof got.frame === "string" ? { frame: got.frame } : {}),
   };
   return profile;
 }
@@ -202,8 +203,11 @@ export const onEvent: DriverModule["onEvent"] = async (event) => {
         post({ type: "profile", ...(await loadProfile()) });
       } else if (message?.type === "save-name") {
         await saveProfile({ name: cleanName(message.name) });
-      } else if (message?.type === "save-background") {
-        await saveProfile({ background: message.background });
+      } else if (message?.type === "save-style") {
+        await saveProfile({
+          ...(message.background ? { background: message.background } : {}),
+          ...(message.frame ? { frame: message.frame } : {}),
+        });
       } else if (message?.type === "place") {
         try {
           await place(message.cards);

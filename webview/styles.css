@@ -441,10 +441,95 @@ h2 {
     box-shadow: 0 0 0 2px var(--navy-deep), 0 0 12px rgba(201, 164, 92, 0.55);
 }
 
+.backgrounds {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 2px;
+}
+
+.fx-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.fx {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    padding: 4px 3px 5px;
+    border: 1px solid var(--navy-line);
+    border-radius: 10px;
+    background: rgba(8, 19, 43, 0.5);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.fx-thumb {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    border-radius: 6px;
+    image-rendering: pixelated;
+}
+
+.fx span {
+    font: 600 10px/1.2 var(--sans);
+    color: var(--parchment);
+}
+
+.fx[aria-pressed="true"] {
+    border-color: var(--gold);
+    box-shadow: 0 0 12px rgba(201, 164, 92, 0.45);
+}
+
+.frames {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.frame {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 8px 4px 6px;
+    border: 1px solid var(--navy-line);
+    border-radius: 12px;
+    background: radial-gradient(circle at 50% 35%, #23407f, var(--navy) 70%);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.frame-thumb {
+    width: 48px;
+    height: 55.5px;
+    border-radius: 4px;
+}
+
+.frame-name {
+    font: 600 11px/1.2 var(--serif);
+    color: var(--parchment);
+}
+
+.frame em {
+    font: 700 9.5px/1 var(--sans);
+    font-style: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.frame[aria-pressed="true"] {
+    border-color: var(--gold);
+    box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
+}
+
 .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
     display: grid;
     gap: 6px;
-    margin-top: 14px;
+    margin: 14px -12px -20px;
+    padding: 18px 12px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(8, 19, 43, 0) 0%, rgba(8, 19, 43, 0.94) 22%, var(--navy-night) 100%);
 }
 
 .primary {
@@ -468,14 +553,6 @@ h2 {
     transform: translateY(1px);
 }
 
-.link {
-    border: 0;
-    background: none;
-    color: var(--gold);
-    font-size: 12px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
 
 .status {
     min-height: 1.4em;

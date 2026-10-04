@@ -36,11 +36,13 @@ export type Scene = {
   timeMs: number;
 };
 
+export type BackdropTime = { ms: number; loopMs: number };
 export type Backdrop = (
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   feet: { x: number; y: number },
+  time: BackdropTime,
 ) => void;
 
 export type StageOptions = {
@@ -68,6 +70,8 @@ export class Stage {
   private textures!: Phaser.Textures.TextureManager;
   private readonly torsoOffsets = new Map<string, Map<string, number>>();
   private backdropTexture: Phaser.Textures.CanvasTexture | null = null;
+  private animatedBackdrop = false;
+  private backdropTime: BackdropTime = { ms: 0, loopMs: FLAP_PERIOD_MS.idle };
   private entity!: Record<string, any>;
   private readonly clock = { now: 0 };
   private wingsId: string | null = null;
@@ -96,8 +100,7 @@ export class Stage {
       create() {
         const texture = this.textures.createCanvas("backdrop", width, height)!;
         stage.backdropTexture = texture;
-        stage.options.backdrop(texture.getContext(), width, height, feet);
-        texture.refresh();
+        stage.paintBackdrop();
         this.add.image(0, 0, "backdrop").setOrigin(0).setDepth(BACKDROP_DEPTH);
         stage.textures = this.textures;
         const groundY = feet.y - FEET_OFFSET;
@@ -162,15 +165,24 @@ export class Stage {
     });
   }
 
-  /** Repaints the scenery behind the character, now or as soon as the stage boots. */
-  setBackdrop(backdrop: Backdrop): void {
+  /**
+   * Repaints the scenery behind the character, now or as soon as the stage
+   * boots. An animated backdrop is repainted every frame at the scene's time,
+   * looping with the card (the wing flap's period).
+   */
+  setBackdrop(backdrop: Backdrop, animated = false): void {
     this.options.backdrop = backdrop;
+    this.animatedBackdrop = animated;
+    this.paintBackdrop();
+  }
+
+  private paintBackdrop(): void {
     const texture = this.backdropTexture;
     if (!texture) return;
     const { width, height, feet } = this.options;
     const ctx = texture.getContext();
     ctx.clearRect(0, 0, width, height);
-    backdrop(ctx, width, height, feet);
+    this.options.backdrop(ctx, width, height, feet, this.backdropTime);
     texture.refresh();
   }
 
@@ -253,6 +265,10 @@ export class Stage {
       .setOrigin(0.5, baseline / cell.h)
       .setPosition(feet.x - this.torsoOffset(look, pose.direction), feet.y);
     this.entity.drawWings({ visible: true, y: feet.y - FEET_OFFSET });
+    if (this.animatedBackdrop) {
+      this.backdropTime = { ms: timeMs, loopMs: pose.walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle };
+      this.paintBackdrop();
+    }
   }
 
   /** Renders one scene and resolves with the frame the game drew. */

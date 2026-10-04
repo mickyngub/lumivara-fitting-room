@@ -5,6 +5,9 @@ import { buildCards, CARD, FRAME, frameAnimation } from "../src/card";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
 import { cleanName, NAME_MAX } from "../src/name";
+import { EFFECTS } from "../src/art/effects";
+import { FRAME_GRID, FRAME_STYLES, paintFrame } from "../src/art/frames";
+import { pixels } from "../src/art/pixels";
 
 const maxKeyframes = 32;
 const idleFrames = 15;
@@ -175,23 +178,60 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name and a Lumivara × Drawdy footer with both logos inside the plate", () => {
+test("a card shows its class name, its frame overlay and a Lumivara × Drawdy footer with both logos inside the plate", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
-  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1 }], { x: 0, y: 0 }, generateIdInSequence);
-  type Box = { type: string; x: number; y: number; width: number; height: number; text?: string; blob?: Blob };
+  const overlay = new ArrayBuffer(1);
+  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1, frame: overlay }], { x: 0, y: 0 }, generateIdInSequence);
+  type Box = { type: string; x: number; y: number; width: number; height: number; text?: string };
   const boxes = elements as unknown as Box[];
   const labels = boxes.filter((e) => e.text);
   assert.deepEqual(
     labels.map((l) => l.text),
     ["Merchant", "Lumivara × Drawdy"],
   );
+  assert.ok(boxes.some((e) => e.type === "image" && e.x === 0 && e.y === 0 && e.width === CARD.w && e.height === CARD.h), "frame overlay covers the card");
   const footer = labels[1];
-  const logos = boxes.filter((e) => e.type === "image" && e.y === footer.y);
+  const logos = boxes.filter((e) => e.type === "image" && e.y >= footer.y && e.y < footer.y + footer.height);
   assert.equal(logos.length, 2);
   for (const box of [...labels, ...logos]) {
-    assert.ok(box.y >= CARD.pad + FRAME.h, `${box.text ?? "logo"} overlaps the frame`);
-    assert.ok(box.y + box.height <= CARD.h - CARD.pad, `${box.text ?? "logo"} leaves the card`);
-    assert.ok(box.x >= CARD.pad && box.x + box.width <= CARD.w - CARD.pad, `${box.text ?? "logo"} leaves the card sideways`);
+    assert.ok(box.y >= CARD.pad + FRAME.h, `${box.text ?? "logo"} overlaps the picture`);
+    assert.ok(box.y + box.height <= CARD.h - CARD.pad, `${box.text ?? "logo"} leaves the plate`);
+    assert.ok(box.x >= CARD.pad && box.x + box.width <= CARD.w - CARD.pad, `${box.text ?? "logo"} leaves the plate sideways`);
+  }
+});
+
+test("every animated background loops without a seam and paints every pixel", () => {
+  for (const effect of EFFECTS) {
+    for (const [w, h, feet] of [
+      [118, 88, { x: 59, y: 71 }],
+      [84, 80, { x: 42, y: 65 }],
+    ] as const) {
+      const start = pixels(w, h);
+      const end = pixels(w, h);
+      effect.paint(start, feet, 0);
+      effect.paint(end, feet, 1);
+      assert.deepEqual(end.data, start.data, `${effect.id} ${w}x${h} seam`);
+      for (let i = 3; i < start.data.length; i += 4) assert.equal(start.data[i], 255, `${effect.id} leaves a hole`);
+    }
+  }
+});
+
+test("every card frame keeps the picture clear, closes its border and rounds its outer corners", () => {
+  const { w, h, picture } = FRAME_GRID;
+  const alpha = (px: { data: Uint8ClampedArray }, x: number, y: number) => px.data[(y * w + x) * 4 + 3];
+  for (const style of FRAME_STYLES) {
+    const px = paintFrame(style);
+    for (let y = picture.y + 2; y < picture.y + picture.h - 2; y++) {
+      for (let x = picture.x + 2; x < picture.x + picture.w - 2; x++) assert.equal(alpha(px, x, y), 0, `${style.id} paints over the picture at ${x},${y}`);
+    }
+    for (const [x, y] of [
+      [Math.floor(w / 2), h - 1],
+      [0, Math.floor(h / 2)],
+      [w - 1, Math.floor(h / 2)],
+    ]) {
+      assert.equal(alpha(px, x, y), 255, `${style.id} border is open at ${x},${y}`);
+    }
+    if (style.corner !== "plate") assert.equal(alpha(px, 0, h - 1), 0, `${style.id} has a square corner`);
   }
 });

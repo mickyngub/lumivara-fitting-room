@@ -8,8 +8,11 @@ import type {
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
 import { loadCatalog, type Catalog } from "./live";
-import { CODE_WING_STYLES, DIRECTIONS, FLAP_PERIOD_MS, Stage, useWingStyles, type Backdrop } from "./stage";
-import { THEMES, themeById, type Theme } from "./themes";
+import { CODE_WING_STYLES, DIRECTIONS, FLAP_PERIOD_MS, Stage, useWingStyles, type Backdrop, type BackdropTime } from "./stage";
+import { EFFECTS, type Effect } from "../src/art/effects";
+import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
+import { pixels, type Pixels } from "../src/art/pixels";
+import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const STAGE_NATIVE = { w: 118, h: 88, feet: { x: 59, y: 71 } };
@@ -39,8 +42,14 @@ const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === class
 let classId = "";
 let outfitId: string | null = null;
 let wingsId: string | null = null;
-let themeId = THEMES[0].id;
-const theme = () => themeById(themeId);
+type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
+const BACKGROUNDS: Background[] = [
+  ...THEMES.map((t) => ({ id: t.id, name: t.name, plate: t.plate, theme: t })),
+  ...EFFECTS.map((e) => ({ id: e.id, name: e.name, plate: e.plate, effect: e })),
+];
+let backgroundId = BACKGROUNDS[0].id;
+const background = () => BACKGROUNDS.find((b) => b.id === backgroundId) ?? BACKGROUNDS[0];
+let frameId = FRAME_STYLES[0].id;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let walking = false;
 let autoTurn = true;
@@ -117,7 +126,20 @@ function drawFloor(ctx: CanvasRenderingContext2D, feet: { x: number; y: number }
   ctx.stroke();
 }
 
-const stageBackdrop = (t: Theme): Backdrop => (ctx, width, height, feet) => {
+const effectPixels = new Map<string, Pixels>();
+const phaseOf = (t: BackdropTime) => ((t.ms % t.loopMs) + t.loopMs) % t.loopMs / t.loopMs;
+
+function paintEffect(ctx: CanvasRenderingContext2D, effect: Effect, width: number, height: number, feet: { x: number; y: number }, phase: number): void {
+  const key = `${width}x${height}`;
+  let px = effectPixels.get(key);
+  if (!px) effectPixels.set(key, (px = pixels(width, height)));
+  effect.paint(px, feet, phase);
+  ctx.putImageData(new ImageData(px.data, width, height), 0, 0);
+}
+
+const stageBackdrop = (b: Background): Backdrop => (ctx, width, height, feet, time) => {
+  if (b.effect) return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
+  const t = b.theme!;
   const sky = ctx.createRadialGradient(width / 2, height * 0.75, 4, width / 2, height * 0.75, width * 0.8);
   sky.addColorStop(0, t.glow);
   sky.addColorStop(0.55, t.plate);
@@ -131,10 +153,11 @@ const stageBackdrop = (t: Theme): Backdrop => (ctx, width, height, feet) => {
   drawFloor(ctx, feet);
 };
 
-// The card plate's colour is baked into every frame so a frame fully covers
+// The card's background is baked into every frame so a frame fully covers
 // the ones beneath it whenever the board draws without animation.
-const cardBackdrop = (t: Theme): Backdrop => (ctx, width, height, feet) => {
-  ctx.fillStyle = t.plate;
+const cardBackdrop = (b: Background): Backdrop => (ctx, width, height, feet, time) => {
+  if (b.effect) return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
+  ctx.fillStyle = b.plate;
   ctx.fillRect(0, 0, width, height);
   drawFloor(ctx, feet);
 };
@@ -235,27 +258,101 @@ function onNameInput(event: Event): void {
   );
 }
 
-function renderSwatches(): void {
-  document.getElementById("swatches")?.replaceChildren(
-    ...THEMES.map((t) =>
-      h("button", {
-        type: "button",
-        class: "swatch",
-        title: t.name,
-        "aria-label": t.name,
-        "aria-pressed": String(t.id === themeId),
-        style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})`,
-        onclick: () => setTheme(t.id, true),
-      }),
-    ),
+const FX_THUMB = { w: 27, h: 18 };
+let fxThumbs: { canvas: HTMLCanvasElement; effect: Effect }[] = [];
+
+function renderBackgrounds(): void {
+  const colours = THEMES.map((t) =>
+    h("button", {
+      type: "button",
+      class: "swatch",
+      title: t.name,
+      "aria-label": t.name,
+      "aria-pressed": String(t.id === backgroundId),
+      style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})`,
+      onclick: () => setBackground(t.id, true),
+    }),
+  );
+  fxThumbs = [];
+  const animated = EFFECTS.map((e) => {
+    const canvas = h("canvas", { width: FX_THUMB.w, height: FX_THUMB.h, class: "fx-thumb" });
+    fxThumbs.push({ canvas, effect: e });
+    return h(
+      "button",
+      { type: "button", class: "fx", title: e.name, "aria-pressed": String(e.id === backgroundId), onclick: () => setBackground(e.id, true) },
+      canvas,
+      h("span", {}, e.name),
+    );
+  });
+  document.getElementById("backgrounds")?.replaceChildren(
+    h("div", { class: "swatches", role: "radiogroup", "aria-label": "สีพื้นหลัง" }, ...colours),
+    h("div", { class: "fx-row", role: "radiogroup", "aria-label": "พื้นหลังเคลื่อนไหว" }, ...animated),
   );
 }
 
-function setTheme(id: string, save: boolean): void {
-  themeId = themeById(id).id;
-  live?.setBackdrop(stageBackdrop(theme()));
-  renderSwatches();
-  if (save) send({ type: "save-background", background: themeId });
+function animateFxThumbs(now: number): void {
+  const phase = (now % FLAP_PERIOD_MS.idle) / FLAP_PERIOD_MS.idle;
+  for (const { canvas, effect } of fxThumbs) {
+    const ctx = canvas.getContext("2d");
+    if (ctx) paintEffect(ctx, effect, FX_THUMB.w, FX_THUMB.h, { x: FX_THUMB.w / 2, y: FX_THUMB.h - 3 }, phase);
+  }
+  requestAnimationFrame(animateFxThumbs);
+}
+
+function setBackground(id: string, save: boolean): void {
+  backgroundId = (BACKGROUNDS.find((b) => b.id === id) ?? BACKGROUNDS[0]).id;
+  live?.setBackdrop(stageBackdrop(background()), !!background().effect);
+  renderBackgrounds();
+  renderFrames();
+  if (save) send({ type: "save-style", background: backgroundId });
+}
+
+function frameCanvas(scale: number): HTMLCanvasElement {
+  const px = paintFrame(frameById(frameId));
+  const small = h("canvas", { width: FRAME_GRID.w, height: FRAME_GRID.h });
+  small.getContext("2d")!.putImageData(new ImageData(px.data, FRAME_GRID.w, FRAME_GRID.h), 0, 0);
+  if (scale === 1) return small;
+  const big = h("canvas", { width: FRAME_GRID.w * scale, height: FRAME_GRID.h * scale });
+  const ctx = big.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(small, 0, 0, big.width, big.height);
+  return big;
+}
+
+function renderFrames(): void {
+  const keep = frameId;
+  const tiles = FRAME_STYLES.map((f) => {
+    frameId = f.id;
+    const thumb = frameCanvas(1);
+    thumb.className = "frame-thumb";
+    thumb.style.background = background().plate;
+    return h(
+      "button",
+      { type: "button", class: "frame", title: `${f.name} · ${f.rarity}`, "aria-pressed": String(f.id === keep), onclick: () => setFrame(f.id, true) },
+      thumb,
+      h("span", { class: "frame-name" }, f.name),
+      h("em", { style: `color:${f.rarityColour}` }, f.rarity),
+    );
+  });
+  frameId = keep;
+  document.getElementById("frames")?.replaceChildren(...tiles);
+  const style = frameById(frameId);
+  const stage = document.querySelector<HTMLElement>(".stage");
+  if (stage) {
+    stage.style.borderColor = style.colours.mid;
+    stage.style.boxShadow = `0 0 0 1px ${style.colours.outline}, 0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.rarityColour}40`;
+  }
+}
+
+function setFrame(id: string, save: boolean): void {
+  frameId = frameById(id).id;
+  renderFrames();
+  if (save) send({ type: "save-style", frame: frameId });
+}
+
+async function frameOverlay(): Promise<ArrayBuffer | undefined> {
+  const blob = await new Promise<Blob | null>((resolve) => frameCanvas(FRAME_GRID.scale).toBlob(resolve, "image/png"));
+  return blob ? blob.arrayBuffer() : undefined;
 }
 
 function setStatus(text: string, error = false): void {
@@ -279,9 +376,9 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     feet: EXPORT_NATIVE.feet,
     looks: catalog.looks,
     wingTextures: catalog.wingTextures,
-    backdrop: cardBackdrop(theme()),
+    backdrop: cardBackdrop(background()),
   });
-  exporter.setBackdrop(cardBackdrop(theme()));
+  exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const count = walking ? WALK_FRAMES : IDLE_FRAMES;
   const loopMs = walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
@@ -307,22 +404,16 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   return { frames, loopMs };
 }
 
-async function placeLooks(looks: Look[]): Promise<void> {
+async function placeLook(): Promise<void> {
   if (busy) return;
   setBusy(true);
-  setStatus(
-    looks.length > 1 ? `กำลังวาง ${looks.length} ชุด…` : "กำลังวางลงบอร์ด…",
-  );
+  setStatus("กำลังวางลงบอร์ด…");
   try {
-    const cards: CardPayload[] = [];
-    for (const l of looks) {
-      const { frames, loopMs } = await exportFrames(l);
-      cards.push({ title: l.className, plate: theme().plate, frames, loopMs });
-    }
-    send(
-      { type: "place", cards },
-      cards.flatMap((c) => c.frames),
-    );
+    const l = look();
+    const { frames, loopMs } = await exportFrames(l);
+    const frame = await frameOverlay();
+    const card: CardPayload = { title: l.className, plate: background().plate, frames, loopMs, ...(frame ? { frame } : {}) };
+    send({ type: "place", cards: [card] }, [...frames, ...(frame ? [frame] : [])]);
   } catch (err) {
     setBusy(false);
     setStatus(err instanceof Error ? err.message : String(err), true);
@@ -387,6 +478,7 @@ function build(): void {
       ),
       h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
     ),
+    h("div", { id: "backgrounds", class: "backgrounds" }),
     h(
       "label",
       { class: "name-field" },
@@ -453,25 +545,12 @@ function build(): void {
         ),
       ),
     ),
-    h("h2", {}, "พื้นหลัง"),
-    h("div", { id: "swatches", class: "swatches", role: "radiogroup", "aria-label": "พื้นหลัง" }),
+    h("h2", {}, "กรอบการ์ด"),
+    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
     h(
       "div",
       { class: "actions" },
-      h(
-        "button",
-        {
-          type: "button",
-          class: "primary",
-          onclick: () => placeLooks([look()]),
-        },
-        "✦ วางลงบอร์ด",
-      ),
-      h(
-        "button",
-        { type: "button", class: "link", onclick: () => placeLooks(OUTFITS) },
-        `วางชุดแฟชั่นทั้งหมด ${OUTFITS.length} ชุดเรียงกัน`,
-      ),
+      h("button", { type: "button", class: "primary", onclick: () => void placeLook() }, "✦ วางลงบอร์ด"),
       h("p", { id: "status", class: "status", role: "status" }),
     ),
     h("div", { id: "exporter", class: "exporter", "aria-hidden": "true" }),
@@ -485,7 +564,7 @@ function build(): void {
     feet: STAGE_NATIVE.feet,
     looks: catalog.looks,
     wingTextures: catalog.wingTextures,
-    backdrop: stageBackdrop(theme()),
+    backdrop: stageBackdrop(background()),
     frame: (now) => {
       if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
         dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
@@ -500,6 +579,7 @@ function build(): void {
     },
   });
   live = liveStage;
+  liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);
   void liveStage.ready.then(() => {
     liveStage.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
     liveStage.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
@@ -524,7 +604,9 @@ function build(): void {
 
   renderPickers();
   renderName();
-  renderSwatches();
+  renderBackgrounds();
+  renderFrames();
+  requestAnimationFrame(animateFxThumbs);
 }
 
 const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
@@ -564,7 +646,8 @@ async function boot(): Promise<void> {
 api.onMessage((raw) => {
   const message = raw as DriverToWebview;
   if (message.type === "profile") {
-    if (message.background) setTheme(message.background, false);
+    if (message.background) setBackground(message.background, false);
+    if (message.frame) setFrame(message.frame, false);
     const input = document.getElementById("name-input") as HTMLInputElement | null;
     if (!message.name || (input ? input.value : playerName)) return;
     playerName = cleanName(message.name);
