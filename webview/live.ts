@@ -7,7 +7,8 @@ import {
   type AtlasJson,
   type LookSource,
 } from "../src/game/catalog";
-import type { Look, WingInfo, WingStyle } from "../src/game/types";
+import { NAME_FRAME_SLICES } from "../src/game/name-frames";
+import type { Look, NameFrame, WingInfo, WingStyle } from "../src/game/types";
 
 const FETCH_TIMEOUT_MS = 15000;
 const PARALLEL_ATLASES = 4;
@@ -18,6 +19,7 @@ export type Catalog = {
   wings: WingInfo[];
   styles: Record<string, WingStyle>;
   wingTextures: Record<string, string>;
+  nameFrames: NameFrame[];
 };
 
 async function fetchOk(url: string): Promise<Response> {
@@ -29,7 +31,7 @@ async function fetchOk(url: string): Promise<Response> {
   return res;
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
+export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -81,7 +83,7 @@ export async function loadCatalog(
   const cosmetics = await (await fetchOk(COSMETICS_URL)).json();
   if (!isCosmetics(cosmetics))
     throw new Error("cosmetics.json has a format this panel does not know");
-  const plan = planCatalog(cosmetics, codeStyles);
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
   const looks: Look[] = new Array(plan.looks.length);
   let done = 0;
   progress(done, plan.looks.length);
@@ -100,5 +102,6 @@ export async function loadCatalog(
     wings: plan.wings.map((w) => w.info),
     styles: Object.fromEntries(plan.wings.map((w) => [w.info.id, w.style])),
     wingTextures: Object.assign({}, ...plan.wings.map((w) => w.textures)),
+    nameFrames: plan.nameFrames,
   };
 }

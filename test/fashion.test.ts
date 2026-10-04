@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { buildCards, CARD, FRAME, frameAnimation, LOGO } from "../src/card";
-import { nameplate } from "../webview/nametag";
+import { layoutNameplate, nameplate, slicePieces, type NameplateLine, type Rect } from "../webview/nametag";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
+import { NAME_FRAME_SLICES } from "../src/game/name-frames";
 import { cleanName, NAME_MAX } from "../src/name";
 import { EFFECTS } from "../src/art/effects";
 import { FRAME_GRID, FRAME_STYLES, paintFrame } from "../src/art/frames";
@@ -20,6 +21,17 @@ const neutralFarTint = 0xb8b8b8;
 const cosmetics: Cosmetics = JSON.parse(readFileSync(new URL("./fixtures/cosmetics.json", import.meta.url), "utf8"));
 const codeStyles = createWingKit(phaserBlendModes).config;
 const directions = createWingKit(phaserBlendModes).directions;
+
+const nameFrames = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES).nameFrames;
+const nameFrame = (id: string) => nameFrames.find((f) => f.id === id)!;
+// World px per character: wide enough for a long name to need shrinking.
+const measureByLength = (line: NameplateLine) => line.text.length * 3;
+const roomy: Rect = { x: -1000, y: -1000, w: 2000, h: 2000 };
+const nameFontEm = 6;
+const near = (actual: number, expected: number, what: string) => assert.ok(Math.abs(actual - expected) < 1e-9, `${what}: ${actual} is not ${expected}`);
+const nearRect = (actual: Rect, expected: Rect, what: string) => {
+  for (const k of ["x", "y", "w", "h"] as const) near(actual[k], expected[k], `${what}.${k}`);
+};
 
 const lookWithFrames = (counts: Record<string, number>): Look => ({
   id: "class:test",
@@ -37,7 +49,7 @@ const lookWithFrames = (counts: Record<string, number>): Look => ({
 });
 
 test("cosmetics.json turns every class and every outfit into a look with its game atlas", () => {
-  const plan = planCatalog(cosmetics, codeStyles);
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
   const outfits = cosmetics.skins.filter((s) => s.slot === "outfit");
   assert.equal(plan.looks.length, cosmetics.classes.length + outfits.length);
   const ranger = plan.looks.find((l) => l.id === "outfit:silverwind_ranger");
@@ -51,7 +63,7 @@ test("cosmetics.json turns every class and every outfit into a look with its gam
 });
 
 test("wings take placement from cosmetics.json and their effect from the game's wing code", () => {
-  const plan = planCatalog(cosmetics, codeStyles);
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
   const demon = plan.wings.find((w) => w.info.id === "demon_wings")!;
   assert.equal(demon.style.aura, codeStyles.demon_wings.aura);
   assert.equal(demon.style.far, codeStyles.demon_wings.far);
@@ -64,11 +76,34 @@ test("wings take placement from cosmetics.json and their effect from the game's 
 
 test("a wing the game's wing code does not know is listed and drawn with a neutral far tint", () => {
   const unknown = { id: "aurora_wings", slot: "wings", name: "Aurora Wings", wings: { url: "/wings/aurora.png", rootX: 0.01, rootY: 0.6, scale: 0.5 } };
-  const plan = planCatalog({ ...cosmetics, skins: [...cosmetics.skins, unknown] }, codeStyles);
+  const plan = planCatalog({ ...cosmetics, skins: [...cosmetics.skins, unknown] }, codeStyles, NAME_FRAME_SLICES);
   const aurora = plan.wings.find((w) => w.info.id === "aurora_wings")!;
   assert.deepEqual(plan.wingsWithoutEffect, ["aurora_wings"]);
   assert.equal(aurora.style.far, neutralFarTint);
   assert.equal(aurora.style.aura, undefined);
+});
+
+test("name frames take their art from cosmetics.json and their slices from the game's stylesheet", () => {
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
+  const listed = cosmetics.skins.filter((s) => s.slot === "nameframe").map((s) => s.id);
+  assert.equal(listed.length, 10);
+  assert.deepEqual(plan.nameFrames.map((f) => f.id), listed);
+  const star = nameFrame("celestial_star");
+  assert.equal(star.name, "Celestial Star");
+  assert.equal(star.url, `${LUMIVARA}/name-frames/celestial_star.png`);
+  assert.equal(star.gemUrl, `${LUMIVARA}/name-frames/celestial_star-gem.png`);
+  assert.equal(star.icon, `${LUMIVARA}/items/celestial_star.png`);
+  assert.deepEqual(star.slice, [41, 166, 50, 168]);
+  assert.deepEqual(star.width, [1.435, 5.81, 1.75, 5.88]);
+  assert.deepEqual(plan.nameFramesWithoutSlices, []);
+});
+
+test("a name frame the game's stylesheet has no rule for is left out and listed", () => {
+  const { celestial_star: _lifted, ...others } = NAME_FRAME_SLICES;
+  const plan = planCatalog(cosmetics, codeStyles, others);
+  assert.deepEqual(plan.nameFramesWithoutSlices, ["celestial_star"]);
+  assert.equal(plan.nameFrames.some((f) => f.id === "celestial_star"), false);
+  assert.equal(plan.nameFrames.length, 9);
 });
 
 test("cosmetics.json in a format the panel does not know is refused", () => {
@@ -143,7 +178,7 @@ test("the game's own wing code runs outside the game and places every wing part 
     return { scene, parts };
   }
 
-  const plan = planCatalog(cosmetics, codeStyles);
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
   const kit = createWingKit(phaserBlendModes);
   for (const id of Object.keys(kit.config)) delete kit.config[id];
   Object.assign(kit.config, Object.fromEntries(plan.wings.map((w) => [w.info.id, w.style])));
@@ -228,6 +263,58 @@ test("a nameplate shows the typed name over the class in brackets, smaller, or t
   assert.deepEqual(plate.map((l) => l.text), ["mickyngub", "‹Swordsman›"]);
   assert.ok(plate[1].px < plate[0].px);
   assert.deepEqual(nameplate("", "Mage").map((l) => l.text), ["‹Mage›"]);
+});
+
+test("a name frame wraps the padded name label the way the game's border-image does, with the class under it", () => {
+  const feet = { x: 50, y: 40 };
+  for (const frame of nameFrames) {
+    const plate = layoutNameplate(nameplate("mickyngub", "Swordsman"), measureByLength, feet, roomy, frame);
+    const { box, area, gem } = plate.frame!;
+    nearRect(box, { x: feet.x - (9 * 3 + 0.6 * nameFontEm) / 2, y: feet.y + 7, w: 9 * 3 + 0.6 * nameFontEm, h: 1.4 * nameFontEm }, `${frame.id} label`);
+    const [t, r, b, l] = frame.width.map((v) => v * nameFontEm);
+    nearRect(area, { x: box.x - l, y: box.y - t, w: box.w + l + r, h: box.h + t + b }, `${frame.id} frame`);
+    nearRect(gem, { x: feet.x - (frame.gemWidth * nameFontEm) / 2, y: area.y, w: frame.gemWidth * nameFontEm, h: area.h }, `${frame.id} gem`);
+    const [name, title] = plate.lines;
+    near(name.y, box.y + box.h / 2, `${frame.id} name is off the label's middle`);
+    near(name.size, nameFontEm, `${frame.id} name size`);
+    near(title.y - (title.size * 1.2) / 2, area.y + area.h, `${frame.id} class is not right under the frame`);
+  }
+  const unnamed = layoutNameplate(nameplate("", "Mage"), measureByLength, feet, roomy, nameFrame("sakura_bloom"));
+  near(unnamed.frame!.box.w, 2 * nameFontEm, "an empty label is not the game's 2em minimum");
+  assert.deepEqual(unnamed.lines.map((l) => l.text), ["‹Mage›"]);
+});
+
+test("a nameplate too big for the picture shrinks about the top of its label until it fits", () => {
+  const feet = { x: 46, y: 67 };
+  const room = { x: 1, y: 1, w: 90, h: 100 };
+  const inside = (r: Rect) => r.x >= room.x - 1e-9 && r.y >= room.y - 1e-9 && r.x + r.w <= room.x + room.w + 1e-9 && r.y + r.h <= room.y + room.h + 1e-9;
+  for (const frame of nameFrames) {
+    const plate = layoutNameplate(nameplate("a".repeat(20), "Swordsman"), measureByLength, feet, room, frame);
+    const { box, area } = plate.frame!;
+    assert.ok(inside(area), `${frame.id} leaves the picture`);
+    assert.ok(Math.min(area.x - room.x, room.x + room.w - area.x - area.w) < 1e-9, `${frame.id} shrank more than it had to`);
+    near(box.y, feet.y + 7, `${frame.id} label moved off the feet`);
+    near(box.x + box.w / 2, feet.x, `${frame.id} label is off centre`);
+    assert.ok(plate.lines.every((l) => l.size < nameFontEm), `${frame.id} text kept its size`);
+  }
+  const plain = layoutNameplate(nameplate("mickyngub", "Swordsman"), measureByLength, feet, room);
+  assert.deepEqual(plain.lines.map((l) => l.size), [6, 5], "a plate that fits was resized");
+  assert.equal(plain.frame, undefined);
+});
+
+test("a name frame's nine parts tile its image and its area, corners unstretched and the middle on the label", () => {
+  const frame = nameFrame("celestial_star");
+  const image = { w: 340, h: 131 };
+  const [t, r, b, l] = frame.slice;
+  const box = { x: 200, y: 100, w: 57, h: 40 };
+  const area = { x: box.x - l, y: box.y - t, w: box.w + l + r, h: box.h + t + b };
+  const pieces = slicePieces(frame.slice, image, box, area);
+  assert.equal(pieces.length, 9);
+  assert.equal(pieces.reduce((sum, p) => sum + p.sw * p.sh, 0), image.w * image.h);
+  assert.equal(pieces.reduce((sum, p) => sum + p.dw * p.dh, 0), area.w * area.h);
+  for (const p of [pieces[0], pieces[2], pieces[6], pieces[8]]) assert.deepEqual([p.dw, p.dh], [p.sw, p.sh], "a corner is stretched");
+  assert.deepEqual([pieces[4].dx, pieces[4].dy, pieces[4].dw, pieces[4].dh], [box.x, box.y, box.w, box.h]);
+  assert.deepEqual([pieces[4].sx, pieces[4].sw, pieces[4].sh], [l, image.w - l - r, image.h - t - b]);
 });
 
 test("an action pose plays every frame of the move once per card loop, then stands until the loop closes", () => {

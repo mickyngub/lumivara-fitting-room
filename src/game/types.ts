@@ -39,6 +39,24 @@ export type WingStyle = {
   rimUrl?: string;
 };
 
+/** Top, right, bottom, left, in CSS order. */
+export type Edges = [number, number, number, number];
+
+/**
+ * The game's border-image for a name frame: slices in image pixels, widths
+ * (equal to the outsets) in ems of the name font, and the gem strip's width.
+ */
+export type NameFrameSlices = { slice: Edges; width: Edges; gemWidth: number };
+
+export type NameFrame = NameFrameSlices & {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  url: string;
+  gemUrl?: string;
+};
+
 export type WingKit = {
   config: Record<string, WingStyle>;
   directions: string[];

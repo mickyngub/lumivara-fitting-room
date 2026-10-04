@@ -1,14 +1,14 @@
 import { FRAME, LOGO } from "../src/card";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
-import type { Look, WingInfo } from "../src/game/types";
+import type { Look, NameFrame, WingInfo } from "../src/game/types";
 import type {
   CardPayload,
   DriverToWebview,
   WebviewToDriver,
 } from "../src/messages";
 import { cleanName, NAME_MAX } from "../src/name";
-import { drawNameplate, fillNameplate, loadNameFont, nameplate, styleNameplate } from "./nametag";
-import { loadCatalog, type Catalog } from "./live";
+import { drawNameplate, loadNameFont, nameplate, type NameFrameArt, type Rect } from "./nametag";
+import { loadCatalog, loadImage, type Catalog } from "./live";
 import { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles, type Backdrop, type BackdropTime, type Scene } from "./stage";
 import { FLAP_PERIOD_MS, poseAt, poseById, posesFor, type PoseDef } from "../src/game/poses";
 import { EFFECTS, type Effect } from "../src/art/effects";
@@ -17,14 +17,21 @@ import { pixels, type Pixels } from "../src/art/pixels";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
-const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 64 } };
-const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
 const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 67 } };
+// As tall as the card's picture, with the feet at the same height, so a name frame has the card's room under them.
+const STAGE_NATIVE = { w: 118, h: EXPORT_NATIVE.h, feet: { x: 59, y: EXPORT_NATIVE.feet.y } };
+const STAGE_SCALE_CSS = 2.5;
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
 const SAVE_NAME_MS = 400;
+// The nameplate shrinks to stay this far inside the picture: the stage's
+// thickest card frame, or the card's picture edge.
+const PLATE_MARGIN = 1;
+const insetRoom = (w: number, h: number, inset: number): Rect => ({ x: inset, y: inset, w: w - 2 * inset, h: h - 2 * inset });
+const STAGE_PLATE_ROOM = insetRoom(STAGE_NATIVE.w, STAGE_NATIVE.h, Math.max(...FRAME_STYLES.map((f) => f.band)) + 1 + PLATE_MARGIN);
+const CARD_PLATE_ROOM = insetRoom(EXPORT_NATIVE.w, EXPORT_NATIVE.h, PLATE_MARGIN);
 
 const api = acquireDrawdyApi();
 const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
@@ -37,11 +44,14 @@ let catalog: Catalog;
 let CLASS_LOOKS: Look[] = [];
 let OUTFITS: Look[] = [];
 let WINGS: WingInfo[] = [];
+let NAME_FRAMES: NameFrame[] = [];
 const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === classId);
 
 let classId = "";
 let outfitId: string | null = null;
 let wingsId: string | null = null;
+let nameFrameId: string | null = null;
+const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
 type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
 const BACKGROUNDS: Background[] = [
   ...THEMES.map((t) => ({ id: t.id, name: t.name, plate: t.plate, theme: t })),
@@ -244,6 +254,9 @@ function renderChoices(): void {
   document
     .querySelectorAll<HTMLElement>("[data-wings]")
     .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.wings || null) === wingsId)));
+  document
+    .querySelectorAll<HTMLElement>("[data-name-frame]")
+    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.nameFrame || null) === nameFrameId)));
   const current = poseOf(look()).id;
   document.getElementById("poses")!.replaceChildren(
     ...posesFor(look()).map((p) =>
@@ -265,8 +278,38 @@ function renderChoices(): void {
   );
 }
 
+const frameArt = new Map<string, Promise<NameFrameArt>>();
+
+function nameFrameArt(frame: NameFrame): Promise<NameFrameArt> {
+  let art = frameArt.get(frame.id);
+  if (!art) {
+    art = Promise.all([loadImage(frame.url), frame.gemUrl ? loadImage(frame.gemUrl) : undefined]).then(([image, gem]) => ({
+      frame,
+      image,
+      ...(gem ? { gem } : {}),
+    }));
+    art.catch(() => frameArt.delete(frame.id));
+    frameArt.set(frame.id, art);
+  }
+  return art;
+}
+
+let plateDraw = 0;
+
+// The stage's plate is drawn the way the card's is, at the screen's resolution.
 function renderName(): void {
-  fillNameplate(document.getElementById("nameplate")!, nameplate(playerName, catalog ? look().className : ""), STAGE_SCALE_CSS);
+  const canvas = document.getElementById("nameplate") as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const lines = nameplate(playerName, catalog ? look().className : "");
+  const frame = nameFrame();
+  const draw = ++plateDraw;
+  void Promise.all([loadNameFont(lines), frame && nameFrameArt(frame).catch(() => undefined)]).then(([, art]) => {
+    if (draw !== plateDraw) return;
+    const scale = STAGE_SCALE_CSS * devicePixelRatio;
+    canvas.width = Math.round(STAGE_NATIVE.w * scale);
+    canvas.height = Math.round(STAGE_NATIVE.h * scale);
+    drawNameplate(canvas.getContext("2d")!, lines, STAGE_NATIVE.feet, scale, STAGE_PLATE_ROOM, art);
+  });
 }
 
 function onNameInput(event: Event): void {
@@ -426,6 +469,8 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   const { cardFrames, loopMs } = poseOf(l);
   const lines = nameplate(playerName, l.className);
   await loadNameFont(lines);
+  const frame = nameFrame();
+  const art = frame ? await nameFrameArt(frame) : undefined;
   const logo = await drawdyLogo();
   const frames: ArrayBuffer[] = [];
   for (let k = 0; k < cardFrames; k++) {
@@ -436,7 +481,7 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
-    drawNameplate(ctx, lines, EXPORT_NATIVE.feet, EXPORT_SCALE);
+    drawNameplate(ctx, lines, EXPORT_NATIVE.feet, EXPORT_SCALE, CARD_PLATE_ROOM, art);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
@@ -477,8 +522,7 @@ const skeletons = (n: number, className: string) => Array.from({ length: n }, ()
 
 /** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
 function buildLayout(): void {
-  const plate = h("div", { id: "nameplate", class: "nameplate", hidden: true });
-  styleNameplate(plate, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
+  const plate = h("canvas", { id: "nameplate", class: "nameplate", "aria-hidden": "true" });
   const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
   loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
   const canvasFrame = h(
@@ -524,6 +568,8 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
+    h("h2", {}, "กรอบชื่อ"),
+    h("div", { id: "name-frames", class: "name-frames", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(11, "name-frame")),
     h(
       "div",
       { class: "actions" },
@@ -661,6 +707,30 @@ function renderWings(): void {
   );
 }
 
+function setNameFrame(id: string | null): void {
+  nameFrameId = id;
+  renderChoices();
+  renderName();
+}
+
+function renderNameFrames(): void {
+  document.getElementById("name-frames")!.replaceChildren(
+    h(
+      "button",
+      { type: "button", class: "name-frame", "data-name-frame": "", onclick: () => setNameFrame(null) },
+      h("span", { class: "none" }, "ไม่ใส่"),
+    ),
+    ...NAME_FRAMES.map((f) =>
+      h(
+        "button",
+        { type: "button", class: "name-frame", "data-name-frame": f.id, title: f.description, onclick: () => setNameFrame(f.id) },
+        f.icon && h("img", { src: f.icon, alt: "", width: 36, height: 36 }),
+        h("span", {}, f.name),
+      ),
+    ),
+  );
+}
+
 const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
 
 async function load(): Promise<void> {
@@ -675,11 +745,13 @@ async function load(): Promise<void> {
   CLASS_LOOKS = catalog.looks.filter((l) => l.kind === "class");
   OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
   WINGS = catalog.wings;
+  NAME_FRAMES = catalog.nameFrames;
   classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
   outfitId = OUTFITS[0]?.id ?? null;
   wingsId = WINGS[0]?.id ?? null;
   startStage();
   renderWings();
+  renderNameFrames();
   renderPickers();
   document.querySelector<HTMLButtonElement>(".primary")!.disabled = false;
 }

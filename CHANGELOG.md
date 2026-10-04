@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- กรอบชื่อ 10 แบบจาก Item Mall ชื่อของคุณอยู่ในกรอบแบบเดียวกับในเกม ทั้งในตัวอย่างและบนการ์ด · the Item Mall's 10 name frames, drawn around your name the way the game draws them, in the preview and on the card
+- ตัวอย่างสูงเท่าภาพบนการ์ด ตัวละครยืนที่ตำแหน่งเดียวกัน · the preview is as tall as the card's picture, with the character standing at the same height
+
 ## 1.0.0
 
 First public release · เปิดให้ใช้ครั้งแรก

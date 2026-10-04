@@ -1,13 +1,15 @@
 {
     "name": "drawdy-lumivara-fashion",
     "version": "0.1.0",
-    "description": "Lumivara Online fitting room for Drawdy: preview outfits and wings, then place the animated character on the board.",
+    "description": "Lumivara Online fitting room for Drawdy: preview outfits, wings and name frames, then place the animated character on the board.",
     "license": "MIT",
     "private": true,
     "type": "module",
     "scripts": {
         "wing-code": "node scripts/wing-code.mjs",
         "check-wings": "node scripts/wing-code.mjs --check",
+        "name-frames": "node scripts/name-frames.mjs",
+        "check-name-frames": "node scripts/name-frames.mjs --check",
         "dev": "vite",
         "build": "node build.ts",
         "test": "tsx --test test/*.test.ts",

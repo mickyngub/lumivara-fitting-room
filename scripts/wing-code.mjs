@@ -4,12 +4,10 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { getText, need } from "./lumivara.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const GAME_DIR = join(ROOT, "src", "game");
-const ORIGIN = "https://lumivaraonline.com";
-// Neutral UA on purpose: nothing that identifies whoever runs the script.
-const UA = "drawdy-lumivara-fashion/0.1 (https://drawdy.io)";
 const WING_METHODS = ["setWings", "drawWings", "wingParts"];
 const MAX_EXTRACTED_BYTES = 40_000;
 // --check lifts the code in memory and compares it with the bundled file
@@ -48,26 +46,6 @@ const canonicalCode = (source) => {
     }
     return out + code.slice(last);
 };
-
-const FETCH_ATTEMPTS = 3;
-const fetchOk = async (path) => {
-    for (let attempt = 1; ; attempt++) {
-        const res = await fetch(ORIGIN + path, { headers: { "user-agent": UA } }).catch((err) => err);
-        if (res instanceof Response && (res.ok || res.status === 404)) {
-            if (!res.ok) throw new Error(`GET ${path}: HTTP 404`);
-            return res;
-        }
-        if (attempt === FETCH_ATTEMPTS) {
-            throw new Error(`GET ${path}: ${res instanceof Response ? `HTTP ${res.status}` : res.message}`);
-        }
-    }
-};
-const getText = async (path) => (await fetchOk(path)).text();
-const need = (value, what) => {
-    if (!value) throw new Error(`${what} not found`);
-    return value;
-};
-
 
 const home = await getText("/");
 const mainChunk = need(home.match(/assets\/main-[\w-]+\.js/)?.[0], "main chunk");

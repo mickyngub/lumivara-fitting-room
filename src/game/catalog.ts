@@ -1,4 +1,4 @@
-import type { Look, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
+import type { Look, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
 
 export const LUMIVARA = "https://lumivaraonline.com";
 export const COSMETICS_URL = `${LUMIVARA}/cosmetics.json`;
@@ -32,6 +32,7 @@ export type Skin = {
   className?: string;
   atlas?: Atlas;
   wings?: WingPlacement;
+  nameFrame?: { url: string; gemUrl?: string };
 };
 export type Cosmetics = {
   format: number;
@@ -51,6 +52,8 @@ export type CatalogPlan = {
   looks: LookSource[];
   wings: WingEntry[];
   wingsWithoutEffect: string[];
+  nameFrames: NameFrame[];
+  nameFramesWithoutSlices: string[];
 };
 
 export const absolute = (path: string) => new URL(path, LUMIVARA).href;
@@ -68,11 +71,14 @@ export function isCosmetics(v: unknown): v is Cosmetics {
 /**
  * Turns the game's cosmetics.json into the panel's looks and wing styles.
  * Placement comes from the file; the wing effect (aura, far tint) comes from
- * the bundled wing code until the file carries it.
+ * the bundled wing code until the file carries it. Name frames take their art
+ * from the file and their slices from the game's stylesheet, so a frame the
+ * stylesheet has not been lifted for yet is left out.
  */
 export function planCatalog(
   c: Cosmetics,
   codeStyles: Record<string, WingStyle>,
+  frameSlices: Record<string, NameFrameSlices>,
 ): CatalogPlan {
   const classNames = new Map(c.classes.map((k) => [k.id, k.name]));
   const looks: LookSource[] = [
@@ -141,7 +147,26 @@ export function planCatalog(
       },
     });
   }
-  return { build: c.build, looks, wings, wingsWithoutEffect };
+  const nameFrames: NameFrame[] = [];
+  const nameFramesWithoutSlices: string[] = [];
+  for (const s of c.skins) {
+    if (s.slot !== "nameframe" || !s.nameFrame) continue;
+    const slices = frameSlices[s.id];
+    if (!slices) {
+      nameFramesWithoutSlices.push(s.id);
+      continue;
+    }
+    nameFrames.push({
+      id: s.id,
+      name: s.name,
+      description: s.description ?? "",
+      ...(s.icon ? { icon: absolute(s.icon) } : {}),
+      url: absolute(s.nameFrame.url),
+      ...(s.nameFrame.gemUrl ? { gemUrl: absolute(s.nameFrame.gemUrl) } : {}),
+      ...slices,
+    });
+  }
+  return { build: c.build, looks, wings, wingsWithoutEffect, nameFrames, nameFramesWithoutSlices };
 }
 
 type AtlasFrame = {
