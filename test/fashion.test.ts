@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildCards, CARD, FRAME, frameAnimation } from "../src/card";
+import { buildCards, CARD, FRAME, frameAnimation, WORDMARK_BOX } from "../src/card";
+import { DRAWDY_WORDMARK } from "../src/brand-icons";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
 import { cleanName, NAME_MAX } from "../src/name";
@@ -178,7 +179,7 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name, its frame overlay and a Lumivara × Drawdy footer with both logos inside the plate", () => {
+test("a card shows its class name under the picture and the Drawdy wordmark in its bottom-right corner, clear of every frame", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
   const overlay = new ArrayBuffer(1);
@@ -188,16 +189,24 @@ test("a card shows its class name, its frame overlay and a Lumivara × Drawdy fo
   const labels = boxes.filter((e) => e.text);
   assert.deepEqual(
     labels.map((l) => l.text),
-    ["Merchant", "Lumivara × Drawdy"],
+    ["Merchant"],
   );
+  assert.ok(labels[0].y >= CARD.pad + FRAME.h, "the title overlaps the picture");
   assert.ok(boxes.some((e) => e.type === "image" && e.x === 0 && e.y === 0 && e.width === CARD.w && e.height === CARD.h), "frame overlay covers the card");
-  const footer = labels[1];
-  const logos = boxes.filter((e) => e.type === "image" && e.y >= footer.y && e.y < footer.y + footer.height);
-  assert.equal(logos.length, 2);
-  for (const box of [...labels, ...logos]) {
-    assert.ok(box.y >= CARD.pad + FRAME.h, `${box.text ?? "logo"} overlaps the picture`);
-    assert.ok(box.y + box.height <= CARD.h - CARD.pad, `${box.text ?? "logo"} leaves the plate`);
-    assert.ok(box.x >= CARD.pad && box.x + box.width <= CARD.w - CARD.pad, `${box.text ?? "logo"} leaves the plate sideways`);
+  const logos = boxes.filter((e) => e.type === "image" && e.y >= CARD.pad + FRAME.h);
+  assert.equal(logos.length, 1);
+  const [logo] = logos;
+  assert.ok(logo.x > CARD.w / 2 && logo.y > labels[0].y, "the wordmark sits bottom right");
+  assert.ok(logo.height >= 24, "the wordmark is under the logo pack's 24 px minimum");
+  const clear = DRAWDY_WORDMARK.clear;
+  const { scale, w } = FRAME_GRID;
+  for (const style of FRAME_STYLES) {
+    const px = paintFrame(style);
+    for (let y = Math.floor((WORDMARK_BOX.y - clear) / scale); y < Math.ceil((WORDMARK_BOX.y + WORDMARK_BOX.h + clear) / scale); y++) {
+      for (let x = Math.floor((WORDMARK_BOX.x - clear) / scale); x < Math.ceil((WORDMARK_BOX.x + WORDMARK_BOX.w + clear) / scale); x++) {
+        assert.equal(px.data[(y * w + x) * 4 + 3], 0, `${style.id} frame is inside the wordmark's clear space at ${x},${y}`);
+      }
+    }
   }
 });
 

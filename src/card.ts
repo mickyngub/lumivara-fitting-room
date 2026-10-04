@@ -2,7 +2,7 @@ import type {
   DrawdyElementSchema,
   LocalAnimation,
 } from "@drawdy/driver-protocol";
-import { DRAWDY_SYMBOL, DRAWDY_SYMBOL_PNG, LUMIVARA_ICON_PNG, pngBytes } from "./brand-icons";
+import { DRAWDY_WORDMARK, DRAWDY_WORDMARK_PNG, pngBytes } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
 export const FRAME = { w: 336, h: 320 };
@@ -15,10 +15,16 @@ export const PLATE_COLOR = "#16295a";
 const GOLD = "#c9a45c";
 const GOLD_DARK = "#7d6636";
 const PARCHMENT = "#f7f0de";
-const MUTED = "#a9b6d8";
-// textWidth is the line measured in SourGummy, the board's text font, so the
-// two logos sit right beside it.
-const FOOTER = { text: "Lumivara × Drawdy", fontSize: 13, textWidth: 115.39, row: 22, icon: 15.4, gap: 5 };
+// Frame corner ornaments reach 28 px in from the card's edges and the
+// thickest band 20 px; the wordmark keeps its clear space from both.
+const ORNAMENT_REACH = 28;
+const BAND_MAX = 20;
+export const WORDMARK_BOX = {
+  x: CARD.w - ORNAMENT_REACH - DRAWDY_WORDMARK.clear - DRAWDY_WORDMARK.w,
+  y: CARD.h - BAND_MAX - DRAWDY_WORDMARK.clear - DRAWDY_WORDMARK.h,
+  w: DRAWDY_WORDMARK.w,
+  h: DRAWDY_WORDMARK.h,
+};
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross
 // full opacity within 0.1% of a step, so frames swap with hard cuts.
@@ -160,20 +166,14 @@ export function buildCards(
       );
     }
 
-    const below = CARD.pad + FRAME.h + 8;
-    label(below, 36, card.title, 26, PARCHMENT);
-    const footerY = below + 44;
-    label(footerY, FOOTER.row, FOOTER.text, FOOTER.fontSize, MUTED);
-    const logo = (dx: number, w: number, h: number, png: string) =>
-      elements.push({
-        type: "image",
-        drawdyElementId: generateId(),
-        groupId,
-        ...box(dx, footerY + (FOOTER.row - h) / 2, w, h),
-        blob: new Blob([pngBytes(png)], { type: "image/png" }),
-      });
-    logo(CARD.w / 2 - FOOTER.textWidth / 2 - FOOTER.gap - FOOTER.icon, FOOTER.icon, FOOTER.icon, LUMIVARA_ICON_PNG);
-    logo(CARD.w / 2 + FOOTER.textWidth / 2 + DRAWDY_SYMBOL.clear, DRAWDY_SYMBOL.w, DRAWDY_SYMBOL.h, DRAWDY_SYMBOL_PNG);
+    label(CARD.pad + FRAME.h + 4, 36, card.title, 26, PARCHMENT);
+    elements.push({
+      type: "image",
+      drawdyElementId: generateId(),
+      groupId,
+      ...box(WORDMARK_BOX.x, WORDMARK_BOX.y, WORDMARK_BOX.w, WORDMARK_BOX.h),
+      blob: new Blob([pngBytes(DRAWDY_WORDMARK_PNG)], { type: "image/png" }),
+    });
   });
 
   return { elements, animations };
