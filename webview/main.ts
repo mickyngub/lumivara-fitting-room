@@ -20,7 +20,7 @@ import { THEMES, type Theme } from "./themes";
 const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 64 } };
 const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
-const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 63 } };
+const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 67 } };
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
