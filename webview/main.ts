@@ -1,4 +1,5 @@
-import { FRAME } from "../src/card";
+import { FRAME, LOGO } from "../src/card";
+import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, WingInfo } from "../src/game/types";
 import type {
   CardPayload,
@@ -6,7 +7,7 @@ import type {
   WebviewToDriver,
 } from "../src/messages";
 import { cleanName, NAME_MAX } from "../src/name";
-import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
+import { drawNameplate, fillNameplate, loadNameFont, nameplate, styleNameplate } from "./nametag";
 import { loadCatalog, type Catalog } from "./live";
 import { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles, type Backdrop, type BackdropTime, type Scene } from "./stage";
 import { FLAP_PERIOD_MS, poseAt, poseById, posesFor, type PoseDef } from "../src/game/poses";
@@ -16,10 +17,10 @@ import { pixels, type Pixels } from "../src/art/pixels";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
-const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 71 } };
+const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 64 } };
 const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
-const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 69 } };
+const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 63 } };
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
@@ -235,6 +236,7 @@ function renderPickers(): void {
   renderClasses();
   renderFashion();
   renderChoices();
+  renderName();
 }
 
 function renderChoices(): void {
@@ -264,9 +266,7 @@ function renderChoices(): void {
 }
 
 function renderName(): void {
-  const tag = document.getElementById("name-tag")!;
-  tag.textContent = playerName;
-  tag.hidden = !playerName;
+  fillNameplate(document.getElementById("nameplate")!, nameplate(playerName, catalog ? look().className : ""), STAGE_SCALE_CSS);
 }
 
 function onNameInput(event: Event): void {
@@ -402,6 +402,15 @@ function setBusy(next: boolean): void {
     .forEach((b) => (b.disabled = next));
 }
 
+let logoImage: Promise<HTMLImageElement> | null = null;
+const drawdyLogo = () =>
+  (logoImage ??= (async () => {
+    const image = new Image();
+    image.src = png(DRAWDY_SYMBOL_PNG);
+    await image.decode();
+    return image;
+  })());
+
 async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: number }> {
   exporter ??= new Stage({
     parent: document.getElementById("exporter")!,
@@ -415,7 +424,9 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const { cardFrames, loopMs } = poseOf(l);
-  if (playerName) await loadNameFont(playerName);
+  const lines = nameplate(playerName, l.className);
+  await loadNameFont(lines);
+  const logo = await drawdyLogo();
   const frames: ArrayBuffer[] = [];
   for (let k = 0; k < cardFrames; k++) {
     const shot = await exporter.capture(sceneAt(l, direction, (k * loopMs) / cardFrames));
@@ -425,7 +436,10 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
-    if (playerName) drawNameTag(ctx, playerName, EXPORT_NATIVE.feet, EXPORT_SCALE);
+    drawNameplate(ctx, lines, EXPORT_NATIVE.feet, EXPORT_SCALE);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (blob) frames.push(await blob.arrayBuffer());
   }
@@ -440,7 +454,7 @@ async function placeLook(): Promise<void> {
     const l = look();
     const { frames, loopMs } = await exportFrames(l);
     const frame = await frameOverlay();
-    const card: CardPayload = { title: l.className, plate: background().plate, frames, loopMs, ...(frame ? { frame, frameStyle: frameId } : {}) };
+    const card: CardPayload = { plate: background().plate, frames, loopMs, ...(frame ? { frame } : {}) };
     send({ type: "place", cards: [card] }, [...frames, ...(frame ? [frame] : [])]);
   } catch (err) {
     setBusy(false);
@@ -463,15 +477,15 @@ const skeletons = (n: number, className: string) => Array.from({ length: n }, ()
 
 /** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
 function buildLayout(): void {
-  const nameTag = h("span", { id: "name-tag", class: "name-tag", hidden: true });
-  styleNameTag(nameTag, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
+  const plate = h("div", { id: "nameplate", class: "nameplate", hidden: true });
+  styleNameplate(plate, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
   const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
   loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
   const canvasFrame = h(
     "div",
     { id: "stage-frame", class: "stage-frame", style: `width:${STAGE_NATIVE.w * STAGE_SCALE_CSS}px;height:${STAGE_NATIVE.h * STAGE_SCALE_CSS}px` },
     loadingBox,
-    nameTag,
+    plate,
     frameArt,
   );
   const host = h("div", { id: "stage-host", role: "img", "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน" }, canvasFrame);

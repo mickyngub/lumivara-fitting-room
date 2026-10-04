@@ -4,4 +4,3 @@ export const DRAWDY_SYMBOL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAFgAAAAwCAQAAAA/O3WIAA
 // The logo pack's minimum symbol height.
 export const DRAWDY_SYMBOL = { w: 29.3, h: 16 };
 
-export const pngBytes = (base64: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));

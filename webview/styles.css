@@ -246,7 +246,7 @@ button:disabled {
     flex: none;
 }
 
-.name-tag {
+.nameplate {
     position: absolute;
     transform: translateX(-50%);
     white-space: pre;

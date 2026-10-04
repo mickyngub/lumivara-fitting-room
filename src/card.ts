@@ -2,8 +2,8 @@ import type {
   DrawdyElementSchema,
   LocalAnimation,
 } from "@drawdy/driver-protocol";
-import { FRAME_GRID, frameById, paintFrame } from "./art/frames";
-import { DRAWDY_SYMBOL, DRAWDY_SYMBOL_PNG, pngBytes } from "./brand-icons";
+import { FRAME_GRID } from "./art/frames";
+import { DRAWDY_SYMBOL } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
 export const FRAME = { w: FRAME_GRID.picture.w * FRAME_GRID.scale, h: FRAME_GRID.picture.h * FRAME_GRID.scale };
@@ -20,51 +20,15 @@ export const PLATE_COLOR = "#16295a";
 
 const GOLD = "#c9a45c";
 const GOLD_DARK = "#7d6636";
-const PARCHMENT = "#f7f0de";
-// The frame's line around the picture is one grid pixel thick.
-const STRIP_TOP = CARD.pad + FRAME.h + FRAME_GRID.scale;
-const TITLE = { h: 36, fontSize: 26 };
-// One art pixel, less than the logo pack's 43% clear space, so the logo sits
-// in the corner as asked.
-export const LOGO_GAP = FRAME_GRID.scale;
-const PLAIN_INSET = 6;
-
-type Box = { x: number; y: number; w: number; h: number };
-
-/** The title centred between the picture and the frame's bottom band, and the logo in the bottom-right corner, as far from the right band as from the bottom one. */
-export function cardBottom(frameStyle?: string): { title: Box; logo: Box } {
-  const { w, h } = DRAWDY_SYMBOL;
-  const titleAbove = (edge: number): Box => ({
-    x: CARD.pad,
-    y: (STRIP_TOP + edge) / 2 - TITLE.h / 2,
-    w: CARD.w - CARD.pad * 2,
-    h: TITLE.h,
-  });
-  if (!frameStyle) {
-    return {
-      title: titleAbove(CARD.h - PLAIN_INSET),
-      logo: { x: CARD.w - CARD.pad - w, y: CARD.h - CARD.pad - h, w, h },
-    };
-  }
-  const style = frameById(frameStyle);
-  const px = paintFrame(style);
-  const { scale } = FRAME_GRID;
-  const clear = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = Math.floor(y0 / scale); y < Math.ceil(y1 / scale); y++) {
-      for (let x = Math.floor(x0 / scale); x < Math.ceil(x1 / scale); x++) {
-        if (px.data[(y * FRAME_GRID.w + x) * 4 + 3]) return false;
-      }
-    }
-    return true;
-  };
-  const band = style.band * scale;
-  let inset = LOGO_GAP;
-  while (!clear(CARD.w - band - inset - w - LOGO_GAP, CARD.h - band - inset - h - LOGO_GAP, CARD.w - band - inset + LOGO_GAP, CARD.h - band - inset + LOGO_GAP)) inset++;
-  return {
-    title: titleAbove(CARD.h - band),
-    logo: { x: CARD.w - band - inset - w, y: CARD.h - band - inset - h, w, h },
-  };
-}
+// The Drawdy symbol is drawn into the picture, since Drawdy paints animated
+// images above still ones; it sits as far from the picture's right edge as its bottom.
+const LOGO_INSET = 12;
+export const LOGO = {
+  x: FRAME.w - LOGO_INSET - DRAWDY_SYMBOL.w,
+  y: FRAME.h - LOGO_INSET - DRAWDY_SYMBOL.h,
+  w: DRAWDY_SYMBOL.w,
+  h: DRAWDY_SYMBOL.h,
+};
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross
 // full opacity within 0.1% of a step, so frames swap with hard cuts.
@@ -103,30 +67,6 @@ export function buildCards(
       width: w,
       height: h,
     });
-    const label = (
-      dy: number,
-      h: number,
-      text: string,
-      fontSize: number,
-      color: string,
-    ) =>
-      elements.push({
-        type: "shape",
-        componentType: "rect",
-        drawdyElementId: generateId(),
-        groupId,
-        ...box(CARD.pad, dy, CARD.w - CARD.pad * 2, h),
-        fillColor: "transparent",
-        strokeColor: "transparent",
-        strokeWidth: 0,
-        roughness: 0,
-        text,
-        fontSize,
-        textColor: color,
-        textAlign: "center",
-        textVerticalAlign: "middle",
-      });
-
     const plate = card.plate ?? PLATE_COLOR;
     if (card.frame) {
       elements.push(
@@ -205,16 +145,6 @@ export function buildCards(
         }),
       );
     }
-
-    const { title, logo } = cardBottom(card.frame ? card.frameStyle : undefined);
-    label(title.y, title.h, card.title, TITLE.fontSize, PARCHMENT);
-    elements.push({
-      type: "image",
-      drawdyElementId: generateId(),
-      groupId,
-      ...box(logo.x, logo.y, logo.w, logo.h),
-      blob: new Blob([pngBytes(DRAWDY_SYMBOL_PNG)], { type: "image/png" }),
-    });
   });
 
   return { elements, animations };

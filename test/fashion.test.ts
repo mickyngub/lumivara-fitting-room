@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildCards, CARD, cardBottom, FRAME, frameAnimation, LOGO_GAP } from "../src/card";
+import { buildCards, CARD, FRAME, frameAnimation, LOGO } from "../src/card";
+import { nameplate } from "../webview/nametag";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
@@ -197,41 +198,36 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name between the picture and the frame, and the Drawdy symbol in the bottom-right corner of every frame, as far from the right band as the bottom one", () => {
+test("a card is its frame and the animated picture, no text, with the Drawdy symbol in the picture's bottom-right corner", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
-  const overlay = new ArrayBuffer(1);
-  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1, frame: overlay, frameStyle: "silver" }], { x: 0, y: 0 }, generateIdInSequence);
+  const { elements } = buildCards([{ frames: [new ArrayBuffer(1), new ArrayBuffer(1)], loopMs: 1, frame: new ArrayBuffer(1) }], { x: 0, y: 0 }, generateIdInSequence);
   type Box = { type: string; x: number; y: number; width: number; height: number; text?: string };
   const boxes = elements as unknown as Box[];
-  const labels = boxes.filter((e) => e.text);
-  assert.deepEqual(
-    labels.map((l) => l.text),
-    ["Merchant"],
-  );
+  assert.equal(boxes.filter((e) => e.text).length, 0, "the card has a text label");
   assert.ok(boxes.some((e) => e.type === "image" && e.x === 0 && e.y === 0 && e.width === CARD.w && e.height === CARD.h), "frame overlay covers the card");
-  const logos = boxes.filter((e) => e.type === "image" && e.y >= CARD.pad + FRAME.h);
-  assert.equal(logos.length, 1);
-  assert.deepEqual([logos[0].x, logos[0].y], [cardBottom("silver").logo.x, cardBottom("silver").logo.y]);
-  const { scale, w, h } = FRAME_GRID;
+  assert.equal(boxes.filter((e) => e.type === "image" && e.x === CARD.pad && e.y === CARD.pad && e.width === FRAME.w && e.height === FRAME.h).length, 2);
+  assert.equal(CARD.w - FRAME.w, 2 * CARD.pad);
+  assert.equal(CARD.h - FRAME.h, 2 * CARD.pad, "the picture does not fill the frame");
+  assert.ok(LOGO.h >= 16, "the symbol is under the logo pack's 16 px minimum");
+  assert.ok(Math.abs(FRAME.w - (LOGO.x + LOGO.w) - (FRAME.h - (LOGO.y + LOGO.h))) < 1e-9, "the symbol is closer to one edge than the other");
+  const { scale, w } = FRAME_GRID;
+  const gap = scale;
   for (const style of FRAME_STYLES) {
     const px = paintFrame(style);
-    const { title, logo } = cardBottom(style.id);
-    const band = CARD.h - style.band * scale;
-    assert.ok(title.y >= CARD.pad + FRAME.h && title.y + title.h <= band, `${style.id} title leaves the strip under the picture`);
-    assert.ok(logo.h >= 16, "the symbol is under the logo pack's 16 px minimum");
-    const touchesFrame = (dx: number, dy: number) => {
-      for (let y = Math.floor((logo.y + dy - LOGO_GAP) / scale); y < Math.ceil((logo.y + dy + logo.h + LOGO_GAP) / scale); y++) {
-        for (let x = Math.floor((logo.x + dx - LOGO_GAP) / scale); x < Math.ceil((logo.x + dx + logo.w + LOGO_GAP) / scale); x++) {
-          if (x >= w || y >= h || px.data[(y * w + x) * 4 + 3]) return true;
-        }
+    for (let y = Math.floor((CARD.pad + LOGO.y - gap) / scale); y < Math.ceil((CARD.pad + LOGO.y + LOGO.h + gap) / scale); y++) {
+      for (let x = Math.floor((CARD.pad + LOGO.x - gap) / scale); x < Math.ceil((CARD.pad + LOGO.x + LOGO.w + gap) / scale); x++) {
+        assert.equal(px.data[(y * w + x) * 4 + 3], 0, `${style.id} frame comes within one art pixel of the symbol at ${x},${y}`);
       }
-      return false;
-    };
-    assert.equal(touchesFrame(0, 0), false, `${style.id} frame comes within one art pixel of the symbol`);
-    assert.ok(touchesFrame(1, 1), `${style.id} symbol could sit further into the corner`);
-    assert.ok(Math.abs(CARD.w - style.band * scale - (logo.x + logo.w) - (band - (logo.y + logo.h))) < 1e-9, `${style.id} symbol is closer to one band than the other`);
+    }
   }
+});
+
+test("a nameplate shows the typed name over the class in brackets, smaller, or the class alone", () => {
+  const plate = nameplate("mickyngub", "Swordsman");
+  assert.deepEqual(plate.map((l) => l.text), ["mickyngub", "‹Swordsman›"]);
+  assert.ok(plate[1].px < plate[0].px);
+  assert.deepEqual(nameplate("", "Mage").map((l) => l.text), ["‹Mage›"]);
 });
 
 test("an action pose plays every frame of the move once per card loop, then stands until the loop closes", () => {
