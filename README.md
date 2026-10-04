@@ -2,6 +2,8 @@
 
 ลองชุดแฟชั่นและปีกของ Lumivara Online บนตัวละครของคุณก่อนซื้อ แล้ววางการ์ดตัวละครที่ขยับได้ลงบอร์ด Drawdy ให้เพื่อนดู
 
+![เลือกอาชีพ ชุด ปีก และท่า ใส่ชื่อ พื้นหลังและกรอบ แล้ววางการ์ดลงบอร์ด · Pick a class, outfit, wings and pose, add a name, background and frame, then place the card](https://raw.githubusercontent.com/mickyngub/lumivara-fitting-room/main/docs/media/fitting-room.gif)
+
 ## วิธีใช้
 
 1. ติดตั้งแล้วห้องแต่งตัวจะเปิดขึ้นเอง ครั้งต่อไปกดไอคอน Lumivara ที่แถบด้านขวาของบอร์ด
