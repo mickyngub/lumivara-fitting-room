@@ -15,7 +15,7 @@ import { pixels, type Pixels } from "../src/art/pixels";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
-const STAGE_NATIVE = { w: 118, h: 88, feet: { x: 59, y: 71 } };
+const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 71 } };
 const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
 const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 65 } };
@@ -338,16 +338,25 @@ function renderFrames(): void {
   document.getElementById("frames")?.replaceChildren(...tiles);
   const style = frameById(frameId);
   const stage = document.querySelector<HTMLElement>(".stage");
-  if (stage) {
-    stage.style.borderColor = style.colours.mid;
-    stage.style.boxShadow = `0 0 0 1px ${style.colours.outline}, 0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.rarityColour}40`;
-  }
+  if (stage) stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.rarityColour}40`;
+  drawStageFrame();
 }
 
 function setFrame(id: string, save: boolean): void {
   frameId = frameById(id).id;
   renderFrames();
   if (save) send({ type: "save-style", frame: frameId });
+}
+
+// The chosen card frame, fitted to the preview's own pixel grid.
+function drawStageFrame(): void {
+  const canvas = document.getElementById("stage-frame-art") as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const style = frameById(frameId);
+  const inset = style.band + 1;
+  const { w, h } = STAGE_NATIVE;
+  const px = paintFrame(style, { w, h, scale: 1, picture: { x: inset, y: inset, w: w - inset * 2, h: h - inset * 2 } });
+  canvas.getContext("2d")!.putImageData(new ImageData(px.data, w, h), 0, 0);
 }
 
 async function frameOverlay(): Promise<ArrayBuffer | undefined> {
@@ -423,7 +432,8 @@ async function placeLook(): Promise<void> {
 function build(): void {
   const nameTag = h("span", { id: "name-tag", class: "name-tag", hidden: true });
   styleNameTag(nameTag, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
-  const canvasFrame = h("div", { class: "stage-frame" }, nameTag);
+  const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
+  const canvasFrame = h("div", { class: "stage-frame" }, nameTag, frameArt);
   const host = h(
     "div",
     {

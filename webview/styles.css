@@ -24,6 +24,12 @@
 
 html {
     background: var(--navy-night);
+    overscroll-behavior: none;
+    scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+    display: none;
 }
 
 body {
@@ -112,8 +118,7 @@ button:disabled {
     width: 296px;
     max-width: 100%;
     margin: 0 auto;
-    border: 1px solid var(--gold);
-    border-radius: 16px;
+    border-radius: 10px;
     overflow: hidden;
     background:
         radial-gradient(1px 1px at 18% 20%, rgba(255, 233, 166, 0.55), transparent 60%),
@@ -121,10 +126,16 @@ button:disabled {
         radial-gradient(1.5px 1.5px at 70% 38%, rgba(255, 255, 255, 0.3), transparent 60%),
         radial-gradient(1px 1px at 30% 44%, rgba(255, 233, 166, 0.35), transparent 60%),
         radial-gradient(80% 70% at 50% 75%, #2a4688 0%, var(--navy) 55%, var(--navy-deep) 100%);
-    box-shadow:
-        inset 0 0 0 3px var(--navy-deep),
-        inset 0 0 0 4px var(--gold-dark),
-        0 10px 28px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.stage-frame-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    pointer-events: none;
 }
 
 /* An always-on scrollbar can make the stage narrower than the canvas, so the
@@ -156,6 +167,7 @@ button:disabled {
     white-space: pre;
     text-align: center;
     pointer-events: none;
+    z-index: 1;
 }
 
 .name-field {
@@ -223,17 +235,17 @@ button:disabled {
 }
 
 .turn.left {
-    left: 8px;
+    left: 16px;
 }
 
 .turn.right {
-    right: 8px;
+    right: 16px;
 }
 
 .pose {
     position: absolute;
-    left: 10px;
-    top: 10px;
+    left: 18px;
+    top: 18px;
     padding: 4px 10px;
     border: 1px solid var(--gold-dark);
     border-radius: 999px;
@@ -244,8 +256,8 @@ button:disabled {
 
 .drag-hint {
     position: absolute;
-    right: 12px;
-    top: 14px;
+    right: 20px;
+    top: 22px;
     color: var(--faint);
     font-size: 10.5px;
     pointer-events: none;
@@ -528,7 +540,7 @@ h2 {
     display: grid;
     gap: 6px;
     margin: 14px -12px -20px;
-    padding: 18px 12px calc(12px + env(safe-area-inset-bottom));
+    padding: 14px 12px calc(8px + env(safe-area-inset-bottom));
     background: linear-gradient(180deg, rgba(8, 19, 43, 0) 0%, rgba(8, 19, 43, 0.94) 22%, var(--navy-night) 100%);
 }
 
@@ -555,11 +567,14 @@ h2 {
 
 
 .status {
-    min-height: 1.4em;
     margin: 0;
     color: var(--mint);
     font-size: 12px;
     text-align: center;
+}
+
+.status:empty {
+    display: none;
 }
 
 .status.error {
