@@ -1,15 +1,25 @@
-# Lumivara Fitting Room (Drawdy extension)
+# Lumivara Fitting Room
 
-Try Lumivara Online's fashion items on a live character, then put it on the board. Pick a class, then that class's fashion (its plain look or an outfit made for it; outfits are class-bound in the game), then wings. The preview turns by itself; drag it or use the arrows to turn it, and tap "ลองเดิน" to see it walk. "วางลงบอร์ด" stamps an animated character card. The link under it places every outfit in a row.
+Try every Lumivara Online outfit and wing on your own character before you buy, then put it on your Drawdy board to share with friends.
 
-## Where it comes from
+1. Open the Fitting Room from the Lumivara button in the extension bar.
+2. Pick your class, then its plain look or one of its fashion outfits (outfits are made for one class, as in the game).
+3. Pick wings. Drag the character or use the arrows to turn it, and tap ลองเดิน to see it walk.
+4. Type your in-game name: the same green name tag as in the game appears under your character.
+5. Tap ✦ วางลงบอร์ด to place an animated character card on the board. The link under it places every outfit in a row.
+
+The fashion list, sprites, icons and wings load live from lumivaraonline.com every time the panel opens, so new items show up without an update.
+
+ลองชุดแฟชั่นและปีกทุกแบบของ Lumivara Online บนตัวละครของคุณก่อนซื้อ เลือกอาชีพ ชุด และปีก ดูตัวละครเดินและหมุนรอบตัว ใส่ป้ายชื่อในเกม แล้ววางการ์ดตัวละครลงบอร์ดแชร์ให้เพื่อนดู
+
+## How it works
 
 - Nothing about the fashion is bundled. Every time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits and wings with names, descriptions, icons, atlas paths and wing placement) and builds each look's sprite sheet in the browser from the game's own atlases (`/jobs/<look>/player.png|json`, `/novice-v6/`): idle and walk frames, all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs. If the game cannot be reached the panel says so and offers a retry; there is no offline copy.
 - Rendering uses the game's own engine. The panel embeds Phaser 3.90 (the version the game ships, MIT licence) and draws at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scales the canvas up. A canvas-2D imitation was tried first; compared pixel by pixel against real Phaser it differed on 144 to 922 pixels per pose from texel sampling, so it was replaced.
 - Wings are animated by the game's own code, the one thing that is bundled: code cannot be loaded live (the game's scripts carry no CORS header, and running downloaded code is not allowed). `scripts/wing-code.mjs` lifts the player class's `setWings`, `drawWings` and `wingParts` methods plus every module-level binding they use into `src/game/wings.js`. Placement comes from `cosmetics.json`; the effect (`aura`, far-wing tint `far`) comes from this code, so a wing the code does not know draws with default sparkles until `cosmetics.json` carries `aura` and `far` or the code is lifted again. The body sprite, its feet anchor and the shadow (`ellipse 25×9, #122018, 0.4`) match the game's player drawing.
 - Board cards bake the plate colour into every frame, so a still render (a selected card, a thumbnail) shows one clean pose.
 
-## Commands
+## Development
 
 ```bash
 npm install
