@@ -25,6 +25,7 @@
 html {
     background: var(--navy-night);
     overscroll-behavior: none;
+    scrollbar-gutter: stable;
 }
 
 /* A thumb on no track. Chrome ignores the ::-webkit-scrollbar rules once the
@@ -75,20 +76,8 @@ button:disabled {
     outline-offset: 2px;
 }
 
-.boot {
-    display: grid;
-    gap: 12px;
-    padding: 40px 8px;
-    color: var(--muted);
-    text-align: center;
-}
-
-.boot p {
-    margin: 0;
-}
-
 .boot-bar {
-    width: 220px;
+    width: 160px;
     height: 6px;
     margin: 0 auto;
     border-radius: 999px;
@@ -104,11 +93,6 @@ button:disabled {
     transition: width 0.2s;
 }
 
-.boot .boot-detail {
-    color: var(--faint);
-    font-size: 11.5px;
-    word-break: break-word;
-}
 
 .brand {
     display: flex;
@@ -120,13 +104,13 @@ button:disabled {
 
 .brand span {
     color: var(--gold);
-    font: 600 9.5px var(--serif);
+    font: 600 9.5px/1.2 var(--serif);
     letter-spacing: 0.4em;
 }
 
 .brand h1 {
     margin: 0;
-    font: 600 17px var(--serif);
+    font: 600 17px/1.3 var(--serif);
     color: var(--parchment);
 }
 
@@ -144,6 +128,91 @@ button:disabled {
         radial-gradient(1px 1px at 30% 44%, rgba(255, 233, 166, 0.35), transparent 60%),
         radial-gradient(80% 70% at 50% 75%, #2a4688 0%, var(--navy) 55%, var(--navy-deep) 100%);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.stage.loading .turn,
+.stage.loading .pose,
+.stage.loading .drag-hint {
+    visibility: hidden;
+}
+
+.stage-loading {
+    position: absolute;
+    inset: 0;
+    transition: opacity 0.3s;
+}
+
+.stage-loading.done {
+    opacity: 0;
+}
+
+.stage-loading-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+
+.stage-loading-panel {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    padding: 0 28px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 50%, rgba(8, 19, 43, 0.6), rgba(8, 19, 43, 0.15) 75%);
+}
+
+.stage-loading-panel p {
+    margin: 0;
+}
+
+.stage-loading-title {
+    height: 20px;
+    white-space: nowrap;
+    color: var(--gold-light);
+    font: 600 13px/20px var(--sans);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.stage-loading-detail {
+    min-height: 1.4em;
+    color: var(--muted);
+    font-size: 11px;
+    word-break: break-word;
+}
+
+.retry {
+    padding: 5px 14px;
+    border: 1px solid var(--gold);
+    border-radius: 999px;
+    background: rgba(8, 19, 43, 0.75);
+    color: var(--gold-light);
+    font: 600 12px/1.4 var(--sans);
+}
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 233, 166, 0.09) 50%, transparent 80%);
+    transform: translateX(-100%);
+    animation: shimmer 1.3s infinite;
+}
+
+@keyframes shimmer {
+    to {
+        transform: translateX(100%);
+    }
 }
 
 .stage-frame-art {
@@ -199,7 +268,7 @@ button:disabled {
 
 .name-field span {
     color: var(--gold-light);
-    font: 600 12.5px var(--serif);
+    font: 600 12.5px/1.4 var(--serif);
 }
 
 .name-field input {
@@ -210,7 +279,7 @@ button:disabled {
     border-radius: 10px;
     background: rgba(8, 19, 43, 0.6);
     color: #b9eab5;
-    font: 700 14px var(--sans);
+    font: 700 14px/1.2 var(--sans);
 }
 
 .name-field input::placeholder {
@@ -288,13 +357,29 @@ button:disabled {
 }
 
 .caption b {
-    font: 700 18px var(--serif);
+    min-height: 1.3em;
+    font: 700 18px/1.3 var(--serif);
     color: var(--gold-light);
 }
 
 .caption span {
+    min-height: 1.45em;
     color: var(--gold);
     font-size: 12px;
+    line-height: 1.45;
+}
+
+.caption.loading b,
+.caption.loading span,
+.caption.loading p {
+    justify-self: center;
+    width: 55%;
+    border-radius: 6px;
+    background: rgba(169, 182, 216, 0.12);
+}
+
+.caption.loading p {
+    width: 85%;
 }
 
 .caption p {
@@ -312,7 +397,7 @@ button:disabled {
 h2 {
     margin: 10px 2px 6px;
     color: var(--gold-light);
-    font: 600 13px var(--serif);
+    font: 600 13px/1.4 var(--serif);
 }
 
 .looks {
@@ -322,6 +407,7 @@ h2 {
     margin: 0 -12px;
     padding: 8px 12px 8px;
     scroll-snap-type: x proximity;
+    scroll-padding-inline: 12px;
     scrollbar-width: thin;
     scrollbar-color: var(--gold-dark) transparent;
 }
@@ -417,7 +503,7 @@ h2 {
     justify-items: center;
     align-content: center;
     gap: 2px;
-    min-height: 66px;
+    height: 78px;
     padding: 6px 4px;
     border: 1px solid var(--navy-line);
     border-radius: 12px;
@@ -501,8 +587,12 @@ h2 {
 }
 
 .fx span {
-    font: 600 10px/1.2 var(--sans);
+    max-width: 100%;
+    overflow: hidden;
     color: var(--parchment);
+    font: 600 10px/1.2 var(--sans);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .fx[aria-pressed="true"] {
@@ -517,45 +607,15 @@ h2 {
     margin: 0 -12px;
     padding: 4px 12px 8px;
     scroll-snap-type: x proximity;
+    scroll-padding-inline: 12px;
     scrollbar-width: thin;
     scrollbar-color: var(--gold-dark) transparent;
 }
 
-.frame {
+.frames .fx {
     flex: none;
-    width: 78px;
+    width: calc((100% - 24px) / 5);
     scroll-snap-align: start;
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    padding: 8px 4px 6px;
-    border: 1px solid var(--navy-line);
-    border-radius: 12px;
-    background: radial-gradient(circle at 50% 35%, #23407f, var(--navy) 70%);
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.frame-thumb {
-    width: 48px;
-    height: 55.5px;
-    border-radius: 4px;
-}
-
-.frame-name {
-    font: 600 11px/1.2 var(--serif);
-    color: var(--parchment);
-}
-
-.frame em {
-    font: 700 9.5px/1 var(--sans);
-    font-style: normal;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.frame[aria-pressed="true"] {
-    border-color: var(--gold);
-    box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
 }
 
 .actions {
@@ -578,7 +638,7 @@ h2 {
     box-shadow:
         0 6px 18px rgba(201, 164, 92, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    font: 700 15px var(--serif);
+    font: 700 15px/1.3 var(--serif);
     transition: filter 0.15s, transform 0.15s;
 }
 
@@ -607,6 +667,10 @@ h2 {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .skeleton::after {
+        animation: none;
+    }
+
     * {
         transition: none !important;
     }

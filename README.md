@@ -6,7 +6,7 @@ Try every Lumivara Online outfit and wing on your own character before you buy, 
 2. Pick your class, then its plain look or one of its fashion outfits (outfits are made for one class, as in the game).
 3. Pick wings. Drag the character or use the arrows to turn it, and tap ลองเดิน to see it walk.
 4. Pick a background under the preview: a colour, or an animated pixel-art scene (aurora, starfield, magic circle, embers, sakura) that loops with your card.
-5. Type your in-game name (the same green name tag as in the game), pick a card frame from Common to Mythic, then tap ✦ วางลงบอร์ด to place an animated character card on the board.
+5. Type your in-game name (the same green name tag as in the game), pick a card frame, then tap ✦ วางลงบอร์ด to place an animated character card on the board.
 
 The fashion list, sprites, icons and wings load live from lumivaraonline.com every time the panel opens, so new items show up without an update.
 

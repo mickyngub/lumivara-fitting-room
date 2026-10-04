@@ -232,6 +232,7 @@ function renderPickers(): void {
 }
 
 function renderLabels(): void {
+  if (!catalog) return;
   const l = look();
   document.getElementById("look-name")!.textContent = l.name;
   document.getElementById("look-sub")!.textContent = subtitleFor(l);
@@ -319,26 +320,30 @@ function frameCanvas(scale: number): HTMLCanvasElement {
   return big;
 }
 
+const FRAME_THUMB = { w: 48, h: 32 };
+
 function renderFrames(): void {
-  const keep = frameId;
   const tiles = FRAME_STYLES.map((f) => {
-    frameId = f.id;
-    const thumb = frameCanvas(1);
-    thumb.className = "frame-thumb";
-    thumb.style.background = background().plate;
+    const inset = f.band + 1;
+    const px = paintFrame(f, { ...FRAME_THUMB, scale: 1, picture: { x: inset, y: inset, w: FRAME_THUMB.w - inset * 2, h: FRAME_THUMB.h - inset * 2 } });
+    const art = h("canvas", { width: FRAME_THUMB.w, height: FRAME_THUMB.h });
+    art.getContext("2d")!.putImageData(new ImageData(px.data, FRAME_THUMB.w, FRAME_THUMB.h), 0, 0);
+    const thumb = h("canvas", { width: FRAME_THUMB.w, height: FRAME_THUMB.h, class: "fx-thumb" });
+    const ctx = thumb.getContext("2d")!;
+    ctx.fillStyle = background().plate;
+    ctx.fillRect(0, 0, FRAME_THUMB.w, FRAME_THUMB.h);
+    ctx.drawImage(art, 0, 0);
     return h(
       "button",
-      { type: "button", class: "frame", title: `${f.name} · ${f.rarity}`, "aria-pressed": String(f.id === keep), onclick: () => setFrame(f.id, true) },
+      { type: "button", class: "fx", title: f.name, "aria-pressed": String(f.id === frameId), onclick: () => setFrame(f.id, true) },
       thumb,
-      h("span", { class: "frame-name" }, f.name),
-      h("em", { style: `color:${f.rarityColour}` }, f.rarity),
+      h("span", {}, f.name),
     );
   });
-  frameId = keep;
   document.getElementById("frames")?.replaceChildren(...tiles);
   const style = frameById(frameId);
   const stage = document.querySelector<HTMLElement>(".stage");
-  if (stage) stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.rarityColour}40`;
+  if (stage) stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.colours.mid}40`;
   drawStageFrame();
 }
 
@@ -429,68 +434,53 @@ async function placeLook(): Promise<void> {
   }
 }
 
-function build(): void {
+let loadingBox: HTMLElement | null = null;
+let loadingArtFrame = 0;
+
+function stageControls(turn: (delta: number) => void): HTMLElement[] {
+  return [
+    h("button", { type: "button", class: "turn left", "aria-label": "หมุนซ้าย", onclick: () => turn(1) }, "‹"),
+    h("button", { type: "button", class: "turn right", "aria-label": "หมุนขวา", onclick: () => turn(-1) }, "›"),
+    h(
+      "button",
+      {
+        type: "button",
+        id: "pose",
+        class: "pose",
+        onclick: () => {
+          walking = !walking;
+          renderLabels();
+        },
+      },
+      "ลองเดิน",
+    ),
+    h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
+  ];
+}
+
+const skeletons = (n: number, className: string) => Array.from({ length: n }, () => h("div", { class: `${className} skeleton`, "aria-hidden": "true" }));
+
+/** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
+function buildLayout(): void {
   const nameTag = h("span", { id: "name-tag", class: "name-tag", hidden: true });
   styleNameTag(nameTag, STAGE_NATIVE.feet, STAGE_SCALE_CSS);
   const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
-  const canvasFrame = h("div", { class: "stage-frame" }, nameTag, frameArt);
-  const host = h(
+  loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
+  const canvasFrame = h(
     "div",
-    {
-      id: "stage-host",
-      role: "img",
-      "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
-    },
-    canvasFrame,
+    { id: "stage-frame", class: "stage-frame", style: `width:${STAGE_NATIVE.w * STAGE_SCALE_CSS}px;height:${STAGE_NATIVE.h * STAGE_SCALE_CSS}px` },
+    loadingBox,
+    nameTag,
+    frameArt,
   );
+  const host = h("div", { id: "stage-host", role: "img", "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน" }, canvasFrame);
   const turn = (delta: number) => {
     autoTurn = false;
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
   root.replaceChildren(
     brand(),
-    h(
-      "div",
-      { class: "stage" },
-      host,
-      h(
-        "button",
-        {
-          type: "button",
-          class: "turn left",
-          "aria-label": "หมุนซ้าย",
-          onclick: () => turn(1),
-        },
-        "‹",
-      ),
-      h(
-        "button",
-        {
-          type: "button",
-          class: "turn right",
-          "aria-label": "หมุนขวา",
-          onclick: () => turn(-1),
-        },
-        "›",
-      ),
-      h(
-        "button",
-        {
-          type: "button",
-          id: "pose",
-          class: "pose",
-          onclick: () => {
-            walking = !walking;
-            renderLabels();
-          },
-        },
-        "ลองเดิน",
-      ),
-      h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
-    ),
-    h("div", { id: "backgrounds", class: "backgrounds" }),
-    h("h2", {}, "กรอบการ์ด"),
-    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
+    h("div", { class: "stage loading" }, host, ...stageControls(turn)),
     h(
       "label",
       { class: "name-field" },
@@ -505,67 +495,83 @@ function build(): void {
         oninput: onNameInput,
       }),
     ),
-    h(
-      "div",
-      { class: "caption" },
-      h("b", { id: "look-name" }),
-      h("span", { id: "look-sub" }),
-      h("p", { id: "look-desc" }),
-    ),
+    h("div", { id: "backgrounds", class: "backgrounds" }),
+    h("h2", {}, "กรอบการ์ด"),
+    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
+    h("div", { id: "caption", class: "caption loading" }, h("b", { id: "look-name" }), h("span", { id: "look-sub" }), h("p", { id: "look-desc" })),
     h("h2", {}, "อาชีพ"),
-    h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }),
+    h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }, ...skeletons(5, "look")),
     h("h2", {}, "ชุดแฟชั่น"),
-    h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }),
+    h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
-    h(
-      "div",
-      { class: "wings", role: "radiogroup", "aria-label": "ปีก" },
-      h(
-        "button",
-        {
-          type: "button",
-          class: "wing",
-          "data-wings": "",
-          onclick: () => {
-            wingsId = null;
-            renderLabels();
-          },
-        },
-        h("span", { class: "none" }, "ไม่ใส่"),
-      ),
-      ...WINGS.map((w) =>
-        h(
-          "button",
-          {
-            type: "button",
-            class: "wing",
-            "data-wings": w.id,
-            title: w.description,
-            onclick: () => {
-              wingsId = w.id;
-              renderLabels();
-            },
-          },
-          w.icon &&
-            h("img", {
-              src: w.icon,
-              alt: "",
-              width: 36,
-              height: 36,
-            }),
-          h("span", {}, w.name),
-        ),
-      ),
-    ),
+    h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
     h(
       "div",
       { class: "actions" },
-      h("button", { type: "button", class: "primary", onclick: () => void placeLook() }, "✦ วางลงบอร์ด"),
+      h("button", { type: "button", class: "primary", disabled: true, onclick: () => void placeLook() }, "✦ วางลงบอร์ด"),
       h("p", { id: "status", class: "status", role: "status" }),
     ),
     h("div", { id: "exporter", class: "exporter", "aria-hidden": "true" }),
   );
 
+  let dragX: number | null = null;
+  host.addEventListener("pointerdown", (e) => {
+    if (!live) return;
+    dragX = e.clientX;
+    host.setPointerCapture(e.pointerId);
+  });
+  host.addEventListener("pointermove", (e) => {
+    if (dragX === null) return;
+    const dx = e.clientX - dragX;
+    if (Math.abs(dx) >= DRAG_STEP_PX) {
+      turn(dx > 0 ? -1 : 1);
+      dragX = e.clientX;
+    }
+  });
+  const endDrag = () => (dragX = null);
+  host.addEventListener("pointerup", endDrag);
+  host.addEventListener("pointercancel", endDrag);
+
+  renderName();
+  renderBackgrounds();
+  renderFrames();
+  requestAnimationFrame(animateFxThumbs);
+}
+
+/** While the catalog loads, the preview shows the chosen background at its real size with progress over it. */
+function showLoading(progress: { done: number; total: number } | { error: string }): void {
+  if (!loadingBox) return;
+  let art = loadingBox.querySelector<HTMLCanvasElement>("canvas");
+  if (!art) {
+    art = h("canvas", { class: "stage-loading-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h });
+    const paint = (now: number) => {
+      if (!loadingBox?.isConnected) return;
+      stageBackdrop(background())(art!.getContext("2d")!, STAGE_NATIVE.w, STAGE_NATIVE.h, STAGE_NATIVE.feet, { ms: now, loopMs: FLAP_PERIOD_MS.idle });
+      loadingArtFrame = requestAnimationFrame(paint);
+    };
+    loadingArtFrame = requestAnimationFrame(paint);
+  }
+  const panel =
+    "error" in progress
+      ? h(
+          "div",
+          { class: "stage-loading-panel" },
+          h("p", { class: "stage-loading-title" }, "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
+          h("p", { class: "stage-loading-detail" }, progress.error),
+          h("button", { type: "button", class: "retry", onclick: () => void load() }, "ลองอีกครั้ง"),
+        )
+      : h(
+          "div",
+          { class: "stage-loading-panel" },
+          h("p", { class: "stage-loading-title" }, "กำลังโหลดชุดจาก Lumivara…"),
+          h("div", { class: "boot-bar" }, h("span", { class: "boot-fill", style: `width:${progress.total ? (progress.done / progress.total) * 100 : 0}%` })),
+          h("p", { class: "stage-loading-detail" }, progress.total ? `${progress.done}/${progress.total}` : " "),
+        );
+  loadingBox.replaceChildren(art, panel);
+}
+
+function startStage(): void {
+  const canvasFrame = document.getElementById("stage-frame")!;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const liveStage = new Stage({
     parent: canvasFrame,
@@ -593,54 +599,62 @@ function build(): void {
   void liveStage.ready.then(() => {
     liveStage.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
     liveStage.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
+    // One more frame so the character is drawn before the loading cover lifts.
+    requestAnimationFrame(() => {
+      document.querySelector(".stage")?.classList.remove("loading");
+      loadingBox?.classList.add("done");
+      setTimeout(() => {
+        cancelAnimationFrame(loadingArtFrame);
+        loadingBox?.remove();
+        loadingBox = null;
+      }, 300);
+    });
   });
+}
 
-  let dragX: number | null = null;
-  host.addEventListener("pointerdown", (e) => {
-    dragX = e.clientX;
-    host.setPointerCapture(e.pointerId);
-  });
-  host.addEventListener("pointermove", (e) => {
-    if (dragX === null) return;
-    const dx = e.clientX - dragX;
-    if (Math.abs(dx) >= DRAG_STEP_PX) {
-      turn(dx > 0 ? -1 : 1);
-      dragX = e.clientX;
-    }
-  });
-  const endDrag = () => (dragX = null);
-  host.addEventListener("pointerup", endDrag);
-  host.addEventListener("pointercancel", endDrag);
-
-  renderPickers();
-  renderName();
-  renderBackgrounds();
-  renderFrames();
-  requestAnimationFrame(animateFxThumbs);
+function renderWings(): void {
+  document.getElementById("wings")!.replaceChildren(
+    h(
+      "button",
+      {
+        type: "button",
+        class: "wing",
+        "data-wings": "",
+        onclick: () => {
+          wingsId = null;
+          renderLabels();
+        },
+      },
+      h("span", { class: "none" }, "ไม่ใส่"),
+    ),
+    ...WINGS.map((w) =>
+      h(
+        "button",
+        {
+          type: "button",
+          class: "wing",
+          "data-wings": w.id,
+          title: w.description,
+          onclick: () => {
+            wingsId = w.id;
+            renderLabels();
+          },
+        },
+        w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36 }),
+        h("span", {}, w.name),
+      ),
+    ),
+  );
 }
 
 const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
 
-async function boot(): Promise<void> {
-  const fill = h("span", { class: "boot-fill" });
-  const text = h("p", {}, "กำลังโหลดชุดจาก Lumivara…");
-  root.replaceChildren(brand(), h("div", { class: "boot" }, text, h("div", { class: "boot-bar" }, fill)));
+async function load(): Promise<void> {
+  showLoading({ done: 0, total: 0 });
   try {
-    catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) => {
-      fill.style.width = `${total ? (done / total) * 100 : 0}%`;
-      text.textContent = `กำลังโหลดชุดจาก Lumivara… ${done}/${total}`;
-    });
+    catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) => showLoading({ done, total }));
   } catch (err) {
-    root.replaceChildren(
-      brand(),
-      h(
-        "div",
-        { class: "boot" },
-        h("p", {}, "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
-        h("p", { class: "boot-detail" }, err instanceof Error ? err.message : String(err)),
-        h("button", { type: "button", class: "primary", onclick: () => void boot() }, "ลองอีกครั้ง"),
-      ),
-    );
+    showLoading({ error: err instanceof Error ? err.message : String(err) });
     return;
   }
   useWingStyles(catalog.styles);
@@ -650,7 +664,11 @@ async function boot(): Promise<void> {
   classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
   outfitId = OUTFITS[0]?.id ?? null;
   wingsId = WINGS[0]?.id ?? null;
-  build();
+  startStage();
+  renderWings();
+  renderPickers();
+  document.getElementById("caption")?.classList.remove("loading");
+  document.querySelector<HTMLButtonElement>(".primary")!.disabled = false;
 }
 
 api.onMessage((raw) => {
@@ -674,5 +692,6 @@ api.onMessage((raw) => {
   }
 });
 
+buildLayout();
 send({ type: "ready" });
-void boot();
+void load();

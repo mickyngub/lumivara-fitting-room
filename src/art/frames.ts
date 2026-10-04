@@ -3,8 +3,6 @@ import { pixels, put, rgb, stamp, type Pixels, type Rgb } from "./pixels";
 export type FrameStyle = {
   id: string;
   name: string;
-  rarity: string;
-  rarityColour: string;
   colours: {
     outline: string;
     dark: string;
@@ -35,8 +33,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "classic",
     name: "คลาสสิก",
-    rarity: "Common",
-    rarityColour: "#a9b6d8",
     colours: {
       outline: "#3b2a10",
       dark: "#7d6636",
@@ -53,8 +49,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "silver",
     name: "เงินยวง",
-    rarity: "Uncommon",
-    rarityColour: "#8fe3b8",
     colours: {
       outline: "#22262f",
       dark: "#5c6576",
@@ -71,8 +65,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "crystal",
     name: "คริสตัล",
-    rarity: "Rare",
-    rarityColour: "#4fa3ff",
     colours: {
       outline: "#08183a",
       dark: "#1a4f94",
@@ -90,8 +82,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "amethyst",
     name: "อเมทิสต์",
-    rarity: "Epic",
-    rarityColour: "#b47cff",
     colours: {
       outline: "#1a0830",
       dark: "#4b237f",
@@ -109,8 +99,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "legendary",
     name: "ตำนาน",
-    rarity: "Legendary",
-    rarityColour: "#ffb020",
     colours: {
       outline: "#3a2306",
       dark: "#8a5a12",
@@ -129,8 +117,6 @@ export const FRAME_STYLES: FrameStyle[] = [
   {
     id: "obsidian",
     name: "ออบซิเดียน",
-    rarity: "Mythic",
-    rarityColour: "#ff4d4d",
     colours: {
       outline: "#000000",
       dark: "#121218",
