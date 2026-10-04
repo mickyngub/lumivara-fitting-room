@@ -25,11 +25,28 @@
 html {
     background: var(--navy-night);
     overscroll-behavior: none;
-    scrollbar-width: none;
 }
 
+/* A thumb on no track. Chrome ignores the ::-webkit-scrollbar rules once the
+   standard properties are set, so those are given only where it lacks them. */
 html::-webkit-scrollbar {
-    display: none;
+    width: 6px;
+}
+
+html::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(201, 164, 92, 0.45);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    html {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(201, 164, 92, 0.45) transparent;
+    }
 }
 
 body {
@@ -494,12 +511,20 @@ h2 {
 }
 
 .frames {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     gap: 6px;
+    overflow-x: auto;
+    margin: 0 -12px;
+    padding: 4px 12px 8px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gold-dark) transparent;
 }
 
 .frame {
+    flex: none;
+    width: 78px;
+    scroll-snap-align: start;
     display: grid;
     justify-items: center;
     gap: 2px;

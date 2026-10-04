@@ -489,6 +489,8 @@ function build(): void {
       h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
     ),
     h("div", { id: "backgrounds", class: "backgrounds" }),
+    h("h2", {}, "กรอบการ์ด"),
+    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
     h(
       "label",
       { class: "name-field" },
@@ -555,8 +557,6 @@ function build(): void {
         ),
       ),
     ),
-    h("h2", {}, "กรอบการ์ด"),
-    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
     h(
       "div",
       { class: "actions" },
