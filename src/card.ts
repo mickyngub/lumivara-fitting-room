@@ -85,7 +85,7 @@ export function buildCards(
         drawdyElementId: generateId(),
         groupId,
         ...box(0, 0, CARD.w, CARD.h),
-        fillColor: PLATE_COLOR,
+        fillColor: card.plate ?? PLATE_COLOR,
         fillStyle: "solid",
         strokeColor: GOLD,
         strokeWidth: 3,

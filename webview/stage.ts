@@ -67,6 +67,7 @@ export class Stage {
   private body!: Phaser.GameObjects.Sprite;
   private textures!: Phaser.Textures.TextureManager;
   private readonly torsoOffsets = new Map<string, Map<string, number>>();
+  private backdropTexture: Phaser.Textures.CanvasTexture | null = null;
   private entity!: Record<string, any>;
   private readonly clock = { now: 0 };
   private wingsId: string | null = null;
@@ -77,7 +78,7 @@ export class Stage {
     let markReady: () => void = () => {};
     this.ready = new Promise((resolve) => (markReady = resolve));
     const stage = this;
-    const { width, height, feet, looks, wingTextures, backdrop } = options;
+    const { width, height, feet, looks, wingTextures } = options;
 
     class StageScene extends Phaser.Scene {
       preload() {
@@ -94,7 +95,8 @@ export class Stage {
 
       create() {
         const texture = this.textures.createCanvas("backdrop", width, height)!;
-        backdrop(texture.getContext(), width, height, feet);
+        stage.backdropTexture = texture;
+        stage.options.backdrop(texture.getContext(), width, height, feet);
         texture.refresh();
         this.add.image(0, 0, "backdrop").setOrigin(0).setDepth(BACKDROP_DEPTH);
         stage.textures = this.textures;
@@ -158,6 +160,18 @@ export class Stage {
       scale: { mode: Phaser.Scale.NONE },
       scene: StageScene,
     });
+  }
+
+  /** Repaints the scenery behind the character, now or as soon as the stage boots. */
+  setBackdrop(backdrop: Backdrop): void {
+    this.options.backdrop = backdrop;
+    const texture = this.backdropTexture;
+    if (!texture) return;
+    const { width, height, feet } = this.options;
+    const ctx = texture.getContext();
+    ctx.clearRect(0, 0, width, height);
+    backdrop(ctx, width, height, feet);
+    texture.refresh();
   }
 
   /** Phaser creates its canvas while booting, so this is set once ready resolves. */

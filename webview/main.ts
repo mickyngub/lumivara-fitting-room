@@ -1,4 +1,4 @@
-import { FRAME, PLATE_COLOR } from "../src/card";
+import { FRAME } from "../src/card";
 import type { Look, WingInfo } from "../src/game/types";
 import type {
   CardPayload,
@@ -9,6 +9,7 @@ import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
 import { loadCatalog, type Catalog } from "./live";
 import { CODE_WING_STYLES, DIRECTIONS, FLAP_PERIOD_MS, Stage, useWingStyles, type Backdrop } from "./stage";
+import { THEMES, themeById, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const STAGE_NATIVE = { w: 118, h: 88, feet: { x: 59, y: 71 } };
@@ -26,6 +27,7 @@ const api = acquireDrawdyApi();
 const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
   api.postMessage(message, transfer);
 let exporter: Stage | null = null;
+let live: Stage | null = null;
 const root = document.getElementById("root")!;
 
 let catalog: Catalog;
@@ -37,6 +39,8 @@ const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === class
 let classId = "";
 let outfitId: string | null = null;
 let wingsId: string | null = null;
+let themeId = THEMES[0].id;
+const theme = () => themeById(themeId);
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let walking = false;
 let autoTurn = true;
@@ -113,11 +117,11 @@ function drawFloor(ctx: CanvasRenderingContext2D, feet: { x: number; y: number }
   ctx.stroke();
 }
 
-const stageBackdrop: Backdrop = (ctx, width, height, feet) => {
+const stageBackdrop = (t: Theme): Backdrop => (ctx, width, height, feet) => {
   const sky = ctx.createRadialGradient(width / 2, height * 0.75, 4, width / 2, height * 0.75, width * 0.8);
-  sky.addColorStop(0, "#2a4688");
-  sky.addColorStop(0.55, "#16295a");
-  sky.addColorStop(1, "#0b1a3a");
+  sky.addColorStop(0, t.glow);
+  sky.addColorStop(0.55, t.plate);
+  sky.addColorStop(1, t.edge);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = "rgba(255, 233, 166, 0.5)";
@@ -129,8 +133,8 @@ const stageBackdrop: Backdrop = (ctx, width, height, feet) => {
 
 // The card plate's colour is baked into every frame so a frame fully covers
 // the ones beneath it whenever the board draws without animation.
-const cardBackdrop: Backdrop = (ctx, width, height, feet) => {
-  ctx.fillStyle = PLATE_COLOR;
+const cardBackdrop = (t: Theme): Backdrop => (ctx, width, height, feet) => {
+  ctx.fillStyle = t.plate;
   ctx.fillRect(0, 0, width, height);
   drawFloor(ctx, feet);
 };
@@ -231,6 +235,29 @@ function onNameInput(event: Event): void {
   );
 }
 
+function renderSwatches(): void {
+  document.getElementById("swatches")?.replaceChildren(
+    ...THEMES.map((t) =>
+      h("button", {
+        type: "button",
+        class: "swatch",
+        title: t.name,
+        "aria-label": t.name,
+        "aria-pressed": String(t.id === themeId),
+        style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})`,
+        onclick: () => setTheme(t.id, true),
+      }),
+    ),
+  );
+}
+
+function setTheme(id: string, save: boolean): void {
+  themeId = themeById(id).id;
+  live?.setBackdrop(stageBackdrop(theme()));
+  renderSwatches();
+  if (save) send({ type: "save-background", background: themeId });
+}
+
 function setStatus(text: string, error = false): void {
   const node = document.getElementById("status")!;
   node.textContent = text;
@@ -252,8 +279,9 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     feet: EXPORT_NATIVE.feet,
     looks: catalog.looks,
     wingTextures: catalog.wingTextures,
-    backdrop: cardBackdrop,
+    backdrop: cardBackdrop(theme()),
   });
+  exporter.setBackdrop(cardBackdrop(theme()));
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const count = walking ? WALK_FRAMES : IDLE_FRAMES;
   const loopMs = walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
@@ -289,7 +317,7 @@ async function placeLooks(looks: Look[]): Promise<void> {
     const cards: CardPayload[] = [];
     for (const l of looks) {
       const { frames, loopMs } = await exportFrames(l);
-      cards.push({ title: l.className, frames, loopMs });
+      cards.push({ title: l.className, plate: theme().plate, frames, loopMs });
     }
     send(
       { type: "place", cards },
@@ -425,6 +453,8 @@ function build(): void {
         ),
       ),
     ),
+    h("h2", {}, "พื้นหลัง"),
+    h("div", { id: "swatches", class: "swatches", role: "radiogroup", "aria-label": "พื้นหลัง" }),
     h(
       "div",
       { class: "actions" },
@@ -448,14 +478,14 @@ function build(): void {
   );
 
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const live = new Stage({
+  const liveStage = new Stage({
     parent: canvasFrame,
     width: STAGE_NATIVE.w,
     height: STAGE_NATIVE.h,
     feet: STAGE_NATIVE.feet,
     looks: catalog.looks,
     wingTextures: catalog.wingTextures,
-    backdrop: stageBackdrop,
+    backdrop: stageBackdrop(theme()),
     frame: (now) => {
       if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
         dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
@@ -469,9 +499,10 @@ function build(): void {
       };
     },
   });
-  void live.ready.then(() => {
-    live.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
-    live.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
+  live = liveStage;
+  void liveStage.ready.then(() => {
+    liveStage.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
+    liveStage.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
   });
 
   let dragX: number | null = null;
@@ -493,6 +524,7 @@ function build(): void {
 
   renderPickers();
   renderName();
+  renderSwatches();
 }
 
 const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
@@ -532,6 +564,7 @@ async function boot(): Promise<void> {
 api.onMessage((raw) => {
   const message = raw as DriverToWebview;
   if (message.type === "profile") {
+    if (message.background) setTheme(message.background, false);
     const input = document.getElementById("name-input") as HTMLInputElement | null;
     if (!message.name || (input ? input.value : playerName)) return;
     playerName = cleanName(message.name);

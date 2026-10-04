@@ -415,6 +415,32 @@ h2 {
     box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
 }
 
+.swatches {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 2px 2px;
+}
+
+.swatch {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    padding: 0;
+    border: 2px solid var(--navy-line);
+    border-radius: 50%;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.swatch:hover {
+    transform: scale(1.08);
+}
+
+.swatch[aria-pressed="true"] {
+    border-color: var(--gold-light);
+    box-shadow: 0 0 0 2px var(--navy-deep), 0 0 12px rgba(201, 164, 92, 0.55);
+}
+
 .actions {
     display: grid;
     gap: 6px;

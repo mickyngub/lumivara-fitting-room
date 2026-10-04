@@ -98,19 +98,27 @@ async function freeSpot(
   return centre;
 }
 
-async function savedName(): Promise<string> {
+type Profile = { name: string; background?: string };
+let profile: Profile = { name: "" };
+
+async function loadProfile(): Promise<Profile> {
   const stored = await send({
     type: "command:kv-storage:get",
     req: { key: PROFILE_KEY },
   });
-  const name = stored.res.value?.got?.name;
-  return typeof name === "string" ? cleanName(name) : "";
+  const got = stored.res.value?.got ?? {};
+  profile = {
+    name: typeof got.name === "string" ? cleanName(got.name) : "",
+    ...(typeof got.background === "string" ? { background: got.background } : {}),
+  };
+  return profile;
 }
 
-async function saveName(name: string): Promise<void> {
+async function saveProfile(change: Partial<Profile>): Promise<void> {
+  profile = { ...profile, ...change };
   await send({
     type: "command:kv-storage:set",
-    req: { key: PROFILE_KEY, payload: { name: cleanName(name) } },
+    req: { key: PROFILE_KEY, payload: profile },
   });
 }
 
@@ -191,9 +199,11 @@ export const onEvent: DriverModule["onEvent"] = async (event) => {
       if (event.body.webviewDomId !== webviewId) return;
       const message = event.body.message as WebviewToDriver | null;
       if (message?.type === "ready") {
-        post({ type: "profile", name: await savedName() });
+        post({ type: "profile", ...(await loadProfile()) });
       } else if (message?.type === "save-name") {
-        await saveName(message.name);
+        await saveProfile({ name: cleanName(message.name) });
+      } else if (message?.type === "save-background") {
+        await saveProfile({ background: message.background });
       } else if (message?.type === "place") {
         try {
           await place(message.cards);
