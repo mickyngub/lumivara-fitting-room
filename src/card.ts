@@ -2,7 +2,7 @@ import type {
   DrawdyElementSchema,
   LocalAnimation,
 } from "@drawdy/driver-protocol";
-import { DRAWDY_WORDMARK, DRAWDY_WORDMARK_PNG, pngBytes } from "./brand-icons";
+import { DRAWDY_SYMBOL, DRAWDY_SYMBOL_PNG, pngBytes } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
 export const FRAME = { w: 336, h: 320 };
@@ -16,14 +16,14 @@ const GOLD = "#c9a45c";
 const GOLD_DARK = "#7d6636";
 const PARCHMENT = "#f7f0de";
 // Frame corner ornaments reach 28 px in from the card's edges and the
-// thickest band 20 px; the wordmark keeps its clear space from both.
+// thickest band 20 px; the logo keeps its clear space from both.
 const ORNAMENT_REACH = 28;
 const BAND_MAX = 20;
-export const WORDMARK_BOX = {
-  x: CARD.w - ORNAMENT_REACH - DRAWDY_WORDMARK.clear - DRAWDY_WORDMARK.w,
-  y: CARD.h - BAND_MAX - DRAWDY_WORDMARK.clear - DRAWDY_WORDMARK.h,
-  w: DRAWDY_WORDMARK.w,
-  h: DRAWDY_WORDMARK.h,
+export const LOGO_BOX = {
+  x: CARD.w - ORNAMENT_REACH - DRAWDY_SYMBOL.clear - DRAWDY_SYMBOL.w,
+  y: CARD.h - BAND_MAX - DRAWDY_SYMBOL.clear - DRAWDY_SYMBOL.h,
+  w: DRAWDY_SYMBOL.w,
+  h: DRAWDY_SYMBOL.h,
 };
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross
@@ -171,8 +171,8 @@ export function buildCards(
       type: "image",
       drawdyElementId: generateId(),
       groupId,
-      ...box(WORDMARK_BOX.x, WORDMARK_BOX.y, WORDMARK_BOX.w, WORDMARK_BOX.h),
-      blob: new Blob([pngBytes(DRAWDY_WORDMARK_PNG)], { type: "image/png" }),
+      ...box(LOGO_BOX.x, LOGO_BOX.y, LOGO_BOX.w, LOGO_BOX.h),
+      blob: new Blob([pngBytes(DRAWDY_SYMBOL_PNG)], { type: "image/png" }),
     });
   });
 

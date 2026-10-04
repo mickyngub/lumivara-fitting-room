@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildCards, CARD, FRAME, frameAnimation, WORDMARK_BOX } from "../src/card";
-import { DRAWDY_WORDMARK } from "../src/brand-icons";
+import { buildCards, CARD, FRAME, frameAnimation, LOGO_BOX } from "../src/card";
+import { DRAWDY_SYMBOL } from "../src/brand-icons";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
@@ -198,7 +198,7 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name under the picture and the Drawdy wordmark in its bottom-right corner, clear of every frame", () => {
+test("a card shows its class name under the picture and the Drawdy symbol in its bottom-right corner, clear of every frame", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
   const overlay = new ArrayBuffer(1);
@@ -215,15 +215,15 @@ test("a card shows its class name under the picture and the Drawdy wordmark in i
   const logos = boxes.filter((e) => e.type === "image" && e.y >= CARD.pad + FRAME.h);
   assert.equal(logos.length, 1);
   const [logo] = logos;
-  assert.ok(logo.x > CARD.w / 2 && logo.y > labels[0].y, "the wordmark sits bottom right");
-  assert.ok(logo.height >= 24, "the wordmark is under the logo pack's 24 px minimum");
-  const clear = DRAWDY_WORDMARK.clear;
+  assert.ok(logo.x > CARD.w / 2 && logo.y > labels[0].y, "the symbol sits bottom right");
+  assert.ok(logo.height >= 16, "the symbol is under the logo pack's 16 px minimum");
+  const clear = DRAWDY_SYMBOL.clear;
   const { scale, w } = FRAME_GRID;
   for (const style of FRAME_STYLES) {
     const px = paintFrame(style);
-    for (let y = Math.floor((WORDMARK_BOX.y - clear) / scale); y < Math.ceil((WORDMARK_BOX.y + WORDMARK_BOX.h + clear) / scale); y++) {
-      for (let x = Math.floor((WORDMARK_BOX.x - clear) / scale); x < Math.ceil((WORDMARK_BOX.x + WORDMARK_BOX.w + clear) / scale); x++) {
-        assert.equal(px.data[(y * w + x) * 4 + 3], 0, `${style.id} frame is inside the wordmark's clear space at ${x},${y}`);
+    for (let y = Math.floor((LOGO_BOX.y - clear) / scale); y < Math.ceil((LOGO_BOX.y + LOGO_BOX.h + clear) / scale); y++) {
+      for (let x = Math.floor((LOGO_BOX.x - clear) / scale); x < Math.ceil((LOGO_BOX.x + LOGO_BOX.w + clear) / scale); x++) {
+        assert.equal(px.data[(y * w + x) * 4 + 3], 0, `${style.id} frame is inside the symbol's clear space at ${x},${y}`);
       }
     }
   }
