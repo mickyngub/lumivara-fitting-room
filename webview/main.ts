@@ -684,7 +684,7 @@ api.onMessage((raw) => {
     }
   } else if (message.type === "placed") {
     setBusy(false);
-    setStatus(message.count > 1 ? `วางครบ ${message.count} ชุดแล้ว` : "วางลงบอร์ดแล้ว");
+    setStatus("");
   } else if (message.type === "error") {
     setBusy(false);
     setStatus(message.message, true);
