@@ -2,7 +2,7 @@
     "name": "drawdy-lumivara-fashion",
     "version": "0.1.0",
     "description": "Lumivara Online fitting room for Drawdy: preview outfits and wings, then place the animated character on the board.",
-    "license": "UNLICENSED",
+    "license": "MIT",
     "private": true,
     "type": "module",
     "scripts": {

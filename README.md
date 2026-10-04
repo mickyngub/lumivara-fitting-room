@@ -46,6 +46,10 @@ The extension sends nothing anywhere. It only downloads the game's public fashio
 
 Characters, outfits, wings and their animation are from [Lumivara Online](https://lumivaraonline.com) and load live from the game's site. Rendering uses [Phaser](https://phaser.io) 3.90 (MIT).
 
+## Licence
+
+This extension's code is [MIT](LICENSE). Lumivara Online's art and data are not part of this repository; they load from the game's site. `src/game/wings.js` is the game client's wing animation code, lifted by `scripts/wing-code.mjs` so wings move as in the game; it belongs to Lumivara Online.
+
 ## Development
 
 ```bash
