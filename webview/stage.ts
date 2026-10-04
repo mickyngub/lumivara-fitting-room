@@ -1,9 +1,8 @@
 /// <reference types="phaser" />
 import { createWingKit } from "../src/game/wings.js";
+import { FLAP_PERIOD_MS } from "../src/game/poses";
 import type { Look, WingStyle } from "../src/game/types";
 
-const WALK_FRAME_MS = 90;
-const IDLE_FRAME_MS = 180;
 const FEET_OFFSET = 9;
 const BODY_DEPTH = 10;
 // The game's player shadow: add.ellipse(x, feet, 25, 9, 0x122018, 0.4).
@@ -11,11 +10,6 @@ const SHADOW = { w: 25, h: 9, color: 0x122018, alpha: 0.4 };
 const BACKDROP_DEPTH = -1e6;
 // Rows above the baseline (the feet) that the wings attach to.
 const TORSO_BAND = { top: 26, bottom: 16 };
-// The game's flap is sin(t / 130) walking and sin(t / 420) standing.
-export const FLAP_PERIOD_MS = {
-  walk: 2 * Math.PI * 130,
-  idle: 2 * Math.PI * 420,
-};
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
@@ -27,16 +21,18 @@ export function useWingStyles(styles: Record<string, WingStyle>): void {
   Object.assign(kit.config, styles);
 }
 
-export type Pose = { direction: string; walking: boolean };
+export type BackdropTime = { ms: number; loopMs: number };
+
+/** One moment of a pose: which sprite frame, where the wings are, and the backdrop's place in the loop. */
+export type Pose = { direction: string; anim: string; frame: number; walking: boolean };
 
 export type Scene = {
   look: Look;
   wings: string | null;
   pose: Pose;
-  timeMs: number;
+  wingMs: number;
+  loop: BackdropTime;
 };
-
-export type BackdropTime = { ms: number; loopMs: number };
 export type Backdrop = (
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -240,33 +236,28 @@ export class Stage {
   }
 
   private apply(scene: Scene): void {
-    const { look, pose, timeMs } = scene;
+    const { look, pose } = scene;
     const { feet } = this.options;
     if (scene.wings !== this.wingsId) {
       this.entity.setWings(scene.wings ?? undefined);
       this.wingsId = scene.wings;
     }
-    this.clock.now = timeMs;
+    this.clock.now = scene.wingMs;
     this.entity.wasWalking = pose.walking;
     this.entity.direction = pose.direction;
 
     const { rows, cell, baseline } = look.sheet;
-    const anim = pose.walking ? "walk" : "idle";
-    const rowIndex = Math.max(
-      0,
-      rows.findIndex((r) => r.anim === anim && r.dir === pose.direction),
-    );
+    const rowOf = (anim: string) => rows.findIndex((r) => r.anim === anim && r.dir === pose.direction);
+    const rowIndex = Math.max(0, rowOf(pose.anim) >= 0 ? rowOf(pose.anim) : rowOf("idle"));
     const cols = Math.max(...rows.map((r) => r.count));
-    const frame =
-      Math.floor(timeMs / (pose.walking ? WALK_FRAME_MS : IDLE_FRAME_MS)) %
-      rows[rowIndex].count;
+    const frame = pose.frame % rows[rowIndex].count;
     this.body
       .setTexture(look.id, rowIndex * cols + frame)
       .setOrigin(0.5, baseline / cell.h)
       .setPosition(feet.x - this.torsoOffset(look, pose.direction), feet.y);
     this.entity.drawWings({ visible: true, y: feet.y - FEET_OFFSET });
     if (this.animatedBackdrop) {
-      this.backdropTime = { ms: timeMs, loopMs: pose.walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle };
+      this.backdropTime = scene.loop;
       this.paintBackdrop();
     }
   }

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { buildCards, CARD, FRAME, frameAnimation, WORDMARK_BOX } from "../src/card";
 import { DRAWDY_WORDMARK } from "../src/brand-icons";
+import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
+import type { Look } from "../src/game/types";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
 import { cleanName, NAME_MAX } from "../src/name";
@@ -17,6 +19,22 @@ const phaserBlendModes = { BlendModes: { NORMAL: 0, ADD: 1 } };
 const neutralFarTint = 0xb8b8b8;
 const cosmetics: Cosmetics = JSON.parse(readFileSync(new URL("./fixtures/cosmetics.json", import.meta.url), "utf8"));
 const codeStyles = createWingKit(phaserBlendModes).config;
+const directions = createWingKit(phaserBlendModes).directions;
+
+const lookWithFrames = (counts: Record<string, number>): Look => ({
+  id: "class:test",
+  kind: "class",
+  classId: "test",
+  className: "Test",
+  name: "Test",
+  description: "",
+  sheet: {
+    png: "",
+    cell: { w: 64, h: 72 },
+    baseline: 56,
+    rows: Object.entries(counts).flatMap(([anim, count]) => directions.map((dir) => ({ anim, dir, count }))),
+  },
+});
 
 test("cosmetics.json turns every class and every outfit into a look with its game atlas", () => {
   const plan = planCatalog(cosmetics, codeStyles);
@@ -60,9 +78,8 @@ test("cosmetics.json in a format the panel does not know is refused", () => {
 });
 
 test("a game atlas is laid out with one row per animation and direction, trimmed frames at their offsets", () => {
-  const directions = createWingKit(phaserBlendModes).directions;
   const cell = { w: 64, h: 72 };
-  const counts = { idle: 3, walk: 2 };
+  const counts = { idle: 3, walk: 2, attack: 4 };
   const frames: AtlasJson["frames"] = {};
   let x = 0;
   for (const [anim, count] of Object.entries(counts)) {
@@ -73,11 +90,13 @@ test("a game atlas is laid out with one row per animation and direction, trimmed
       }
     }
   }
+  frames["cast/south/0"] = { frame: { x, y: 0, w: 20, h: 30 }, spriteSourceSize: { x: 0, y: 0 }, sourceSize: cell };
   const layout = layoutSheet({ frames }, directions);
   assert.deepEqual(layout.cell, cell);
   assert.equal(layout.baseline, cell.h - 16);
-  assert.equal(layout.rows.length, directions.length * 2);
-  assert.deepEqual(layout.size, { w: counts.idle * cell.w, h: directions.length * 2 * cell.h });
+  assert.deepEqual([...new Set(layout.rows.map((r) => r.anim))], ["idle", "walk", "attack"], "a pose missing from some directions is left out");
+  assert.equal(layout.rows.length, directions.length * 3);
+  assert.deepEqual(layout.size, { w: counts.attack * cell.w, h: directions.length * 3 * cell.h });
   const walkSecond = layout.rows.findIndex((r) => r.anim === "walk" && r.dir === directions[1]);
   assert.ok(layout.blits.some((b) => b.dx === cell.w + 5 && b.dy === walkSecond * cell.h + 7));
 });
@@ -208,6 +227,28 @@ test("a card shows its class name under the picture and the Drawdy wordmark in i
       }
     }
   }
+});
+
+test("an action pose plays every frame of the move once per card loop, then stands until the loop closes", () => {
+  const look = lookWithFrames({ idle: 8, walk: 8, attack: 9 });
+  const attack = poseById("attack");
+  const shots = Array.from({ length: attack.cardFrames }, (_, k) => poseAt(attack, look, "south", (k * attack.loopMs) / attack.cardFrames));
+  assert.deepEqual(
+    shots.map((f) => `${f.anim}/${f.frame}`),
+    [...Array.from({ length: 9 }, (_, i) => `attack/${i}`), ...Array.from({ length: attack.cardFrames - 9 }, () => "idle/0")],
+  );
+  const next = poseAt(attack, look, "south", attack.loopMs);
+  assert.deepEqual([next.anim, next.frame, next.wingMs], [shots[0].anim, shots[0].frame, shots[0].wingMs], "the loop has a seam");
+  for (const pose of POSES) assert.ok(pose.cardFrames * 2 + 1 <= maxKeyframes, `${pose.id} card needs more keyframes than Drawdy allows`);
+});
+
+test("cast is offered only to sprites that have it, and sitting holds the last sit frame", () => {
+  const mage = lookWithFrames({ idle: 8, walk: 8, attack: 9, "attack-alt": 9, cast: 9, sit: 9 });
+  const outfit = lookWithFrames({ idle: 8, walk: 8, attack: 9, "attack-alt": 9, sit: 6 });
+  assert.deepEqual(posesFor(mage).map((p) => p.id), ["idle", "walk", "attack", "attack-alt", "cast", "sit"]);
+  assert.deepEqual(posesFor(outfit).map((p) => p.id), ["idle", "walk", "attack", "attack-alt", "sit"]);
+  assert.deepEqual(posesFor(lookWithFrames({ idle: 8, walk: 8 })).map((p) => p.id), ["idle", "walk"]);
+  for (const t of [0, 400, 2000]) assert.equal(poseAt(poseById("sit"), outfit, "west", t).frame, 5);
 });
 
 test("every animated background loops without a seam and paints every pixel", () => {

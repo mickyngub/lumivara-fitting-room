@@ -8,7 +8,8 @@ import type {
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
 import { loadCatalog, type Catalog } from "./live";
-import { CODE_WING_STYLES, DIRECTIONS, FLAP_PERIOD_MS, Stage, useWingStyles, type Backdrop, type BackdropTime } from "./stage";
+import { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles, type Backdrop, type BackdropTime, type Scene } from "./stage";
+import { FLAP_PERIOD_MS, poseAt, poseById, posesFor, type PoseDef } from "../src/game/poses";
 import { EFFECTS, type Effect } from "../src/art/effects";
 import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
@@ -19,8 +20,6 @@ const STAGE_NATIVE = { w: 118, h: 92, feet: { x: 59, y: 71 } };
 const STAGE_SCALE_CSS = 2.5;
 const EXPORT_SCALE = 4;
 const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 65 } };
-const WALK_FRAMES = 8;
-const IDLE_FRAMES = 15;
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
@@ -51,7 +50,7 @@ let backgroundId = BACKGROUNDS[0].id;
 const background = () => BACKGROUNDS.find((b) => b.id === backgroundId) ?? BACKGROUNDS[0];
 let frameId = FRAME_STYLES[0].id;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
-let walking = false;
+let poseId = "idle";
 let autoTurn = true;
 let lastTurn = 0;
 let busy = false;
@@ -82,13 +81,20 @@ function h<K extends keyof HTMLElementTagNameMap>(
 
 const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
 const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
-const wing = () => WINGS.find((w) => w.id === wingsId) ?? null;
 const png = (b64: string) => `data:image/png;base64,${b64}`;
+// A look without the chosen pose (cast is the Mage's) stands instead, and gets the pose back when it is chosen again.
+const poseOf = (l: Look): PoseDef => posesFor(l).find((p) => p.id === poseId) ?? poseById("idle");
 
-function subtitleFor(l: Look): string {
-  const base = `${l.className} · ${l.kind === "outfit" ? "ชุดแฟชั่น" : "ชุดปกติ"}`;
-  const w = wing();
-  return w ? `${base} · ${w.name}` : base;
+function sceneAt(l: Look, direction: string, t: number): Scene {
+  const pose = poseOf(l);
+  const f = poseAt(pose, l, direction, t);
+  return {
+    look: l,
+    wings: wingsId,
+    pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
+    wingMs: f.wingMs,
+    loop: f.loop,
+  };
 }
 
 function thumb(l: Look, size: number): HTMLElement {
@@ -228,19 +234,33 @@ function renderFashion(): void {
 function renderPickers(): void {
   renderClasses();
   renderFashion();
-  renderLabels();
+  renderChoices();
 }
 
-function renderLabels(): void {
+function renderChoices(): void {
   if (!catalog) return;
-  const l = look();
-  document.getElementById("look-name")!.textContent = l.name;
-  document.getElementById("look-sub")!.textContent = subtitleFor(l);
-  document.getElementById("look-desc")!.textContent = l.description || wing()?.description || "";
   document
     .querySelectorAll<HTMLElement>("[data-wings]")
     .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.wings || null) === wingsId)));
-  document.getElementById("pose")!.textContent = walking ? "ยืนนิ่ง" : "ลองเดิน";
+  const current = poseOf(look()).id;
+  document.getElementById("poses")!.replaceChildren(
+    ...posesFor(look()).map((p) =>
+      h(
+        "button",
+        {
+          type: "button",
+          class: "pose",
+          role: "radio",
+          "aria-checked": String(p.id === current),
+          onclick: () => {
+            poseId = p.id;
+            renderChoices();
+          },
+        },
+        p.name,
+      ),
+    ),
+  );
 }
 
 function renderName(): void {
@@ -394,17 +414,11 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   });
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
-  const count = walking ? WALK_FRAMES : IDLE_FRAMES;
-  const loopMs = walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
+  const { cardFrames, loopMs } = poseOf(l);
   if (playerName) await loadNameFont(playerName);
   const frames: ArrayBuffer[] = [];
-  for (let k = 0; k < count; k++) {
-    const shot = await exporter.capture({
-      look: l,
-      wings: wingsId,
-      pose: { direction, walking },
-      timeMs: (k * loopMs) / count,
-    });
+  for (let k = 0; k < cardFrames; k++) {
+    const shot = await exporter.capture(sceneAt(l, direction, (k * loopMs) / cardFrames));
     const canvas = document.createElement("canvas");
     canvas.width = FRAME.w;
     canvas.height = FRAME.h;
@@ -441,19 +455,6 @@ function stageControls(turn: (delta: number) => void): HTMLElement[] {
   return [
     h("button", { type: "button", class: "turn left", "aria-label": "หมุนซ้าย", onclick: () => turn(1) }, "‹"),
     h("button", { type: "button", class: "turn right", "aria-label": "หมุนขวา", onclick: () => turn(-1) }, "›"),
-    h(
-      "button",
-      {
-        type: "button",
-        id: "pose",
-        class: "pose",
-        onclick: () => {
-          walking = !walking;
-          renderLabels();
-        },
-      },
-      "ลองเดิน",
-    ),
     h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
   ];
 }
@@ -480,7 +481,12 @@ function buildLayout(): void {
   };
   root.replaceChildren(
     brand(),
-    h("div", { class: "stage loading" }, host, ...stageControls(turn)),
+    h(
+      "div",
+      { class: "stage loading" },
+      h("div", { class: "stage-view" }, host, ...stageControls(turn)),
+      h("div", { id: "poses", class: "poses", role: "radiogroup", "aria-label": "ท่าทาง" }),
+    ),
     h(
       "label",
       { class: "name-field" },
@@ -498,7 +504,6 @@ function buildLayout(): void {
     h("div", { id: "backgrounds", class: "backgrounds" }),
     h("h2", {}, "กรอบการ์ด"),
     h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
-    h("div", { id: "caption", class: "caption loading" }, h("b", { id: "look-name" }), h("span", { id: "look-sub" }), h("p", { id: "look-desc" })),
     h("h2", {}, "อาชีพ"),
     h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }, ...skeletons(5, "look")),
     h("h2", {}, "ชุดแฟชั่น"),
@@ -586,12 +591,7 @@ function startStage(): void {
         dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
         lastTurn = now;
       }
-      return {
-        look: look(),
-        wings: wingsId,
-        pose: { direction: DIRECTIONS[dirIndex], walking },
-        timeMs: reduced ? 0 : now,
-      };
+      return sceneAt(look(), DIRECTIONS[dirIndex], reduced ? 0 : now);
     },
   });
   live = liveStage;
@@ -622,7 +622,7 @@ function renderWings(): void {
         "data-wings": "",
         onclick: () => {
           wingsId = null;
-          renderLabels();
+          renderChoices();
         },
       },
       h("span", { class: "none" }, "ไม่ใส่"),
@@ -637,7 +637,7 @@ function renderWings(): void {
           title: w.description,
           onclick: () => {
             wingsId = w.id;
-            renderLabels();
+            renderChoices();
           },
         },
         w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36 }),
@@ -667,7 +667,6 @@ async function load(): Promise<void> {
   startStage();
   renderWings();
   renderPickers();
-  document.getElementById("caption")?.classList.remove("loading");
   document.querySelector<HTMLButtonElement>(".primary")!.disabled = false;
 }
 

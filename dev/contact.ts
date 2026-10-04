@@ -1,4 +1,5 @@
 import PhaserLib from "phaser";
+import { poseAt, poseById } from "../src/game/poses";
 import type { Look } from "../src/game/types";
 
 (window as unknown as { Phaser: unknown }).Phaser = PhaserLib;
@@ -50,11 +51,13 @@ for (const [r, row] of rows.entries()) {
   const y = 30 + r * CELL.h * SCALE;
   ctx.fillText(row.label, 8, y + (CELL.h * SCALE) / 2);
   for (const [i, direction] of DIRECTIONS.entries()) {
+    const f = poseAt(poseById("idle"), row.look, direction, IDLE_MOMENT_MS);
     const shot = await stage.capture({
       look: row.look,
       wings: row.wings,
-      pose: { direction, walking: false },
-      timeMs: IDLE_MOMENT_MS,
+      pose: { direction, anim: f.anim, frame: f.frame, walking: false },
+      wingMs: f.wingMs,
+      loop: f.loop,
     });
     ctx.drawImage(shot, LABEL_W + i * CELL.w * SCALE, y, CELL.w * SCALE, CELL.h * SCALE);
   }

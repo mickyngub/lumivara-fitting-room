@@ -6,6 +6,8 @@ const COSMETICS_FORMAT = 1;
 // Tint for the far wing of a wing the bundled wing code has never seen.
 const DEFAULT_FAR = 0xb8b8b8;
 const ANIMS = ["idle", "walk"];
+// Action poses ship in every atlas today but are optional; cast is the Mage's.
+const OPTIONAL_ANIMS = ["attack", "attack-alt", "cast", "sit"];
 // The game's sprites stand 16 px above the bottom of their cell.
 const FEET_FROM_BOTTOM = 16;
 
@@ -171,14 +173,23 @@ export function layoutSheet(
   const frames = Array.isArray(json.frames)
     ? Object.fromEntries(json.frames.map((f) => [f.filename!, f]))
     : json.frames;
-  const rows: SheetRow[] = ANIMS.flatMap((anim) =>
-    directions.map((dir) => {
-      let count = 0;
-      while (frames[`${anim}/${dir}/${count}`]) count++;
-      if (!count) throw new Error(`no ${anim}/${dir} frames`);
-      return { anim, dir, count };
-    }),
-  );
+  const countOf = (anim: string, dir: string) => {
+    let count = 0;
+    while (frames[`${anim}/${dir}/${count}`]) count++;
+    return count;
+  };
+  const rows: SheetRow[] = [
+    ...ANIMS.flatMap((anim) =>
+      directions.map((dir) => {
+        const count = countOf(anim, dir);
+        if (!count) throw new Error(`no ${anim}/${dir} frames`);
+        return { anim, dir, count };
+      }),
+    ),
+    ...OPTIONAL_ANIMS.filter((anim) => directions.every((dir) => countOf(anim, dir) > 0)).flatMap((anim) =>
+      directions.map((dir) => ({ anim, dir, count: countOf(anim, dir) })),
+    ),
+  ];
   const sample = frames[`${rows[0].anim}/${rows[0].dir}/0`];
   const cell = { w: sample.sourceSize.w, h: sample.sourceSize.h };
   const cols = Math.max(...rows.map((r) => r.count));

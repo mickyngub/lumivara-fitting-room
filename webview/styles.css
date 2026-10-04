@@ -131,7 +131,6 @@ button:disabled {
 }
 
 .stage.loading .turn,
-.stage.loading .pose,
 .stage.loading .drag-hint {
     visibility: hidden;
 }
@@ -328,16 +327,47 @@ button:disabled {
     right: 16px;
 }
 
+.stage-view {
+    position: relative;
+}
+
+/* Fixed height, so the chips arriving with the catalog move nothing. */
+.poses {
+    display: flex;
+    justify-content: safe center;
+    gap: 4px;
+    height: 36px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border-top: 1px solid var(--navy-line);
+    background: rgba(8, 19, 43, 0.85);
+    scrollbar-width: none;
+}
+
+.poses::-webkit-scrollbar {
+    display: none;
+}
+
 .pose {
-    position: absolute;
-    left: 18px;
-    top: 18px;
-    padding: 4px 10px;
-    border: 1px solid var(--gold-dark);
+    flex: 1 0 auto;
+    padding: 0 7px;
+    border: 1px solid var(--navy-line);
     border-radius: 999px;
-    background: rgba(8, 19, 43, 0.6);
+    background: transparent;
+    color: var(--muted);
+    font: 600 11.5px/22px var(--sans);
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.pose:hover {
+    border-color: var(--gold-dark);
+}
+
+.pose[aria-checked="true"] {
+    border-color: var(--gold);
+    background: rgba(201, 164, 92, 0.18);
     color: var(--gold-light);
-    font-size: 11.5px;
 }
 
 .drag-hint {
@@ -347,51 +377,6 @@ button:disabled {
     color: var(--faint);
     font-size: 10.5px;
     pointer-events: none;
-}
-
-.caption {
-    display: grid;
-    gap: 1px;
-    margin: 10px 2px 4px;
-    text-align: center;
-}
-
-.caption b {
-    min-height: 1.3em;
-    font: 700 18px/1.3 var(--serif);
-    color: var(--gold-light);
-}
-
-.caption span {
-    min-height: 1.45em;
-    color: var(--gold);
-    font-size: 12px;
-    line-height: 1.45;
-}
-
-.caption.loading b,
-.caption.loading span,
-.caption.loading p {
-    justify-self: center;
-    width: 55%;
-    border-radius: 6px;
-    background: rgba(169, 182, 216, 0.12);
-}
-
-.caption.loading p {
-    width: 85%;
-}
-
-.caption p {
-    margin: 4px 0 0;
-    min-height: 2.9em;
-    color: var(--muted);
-    font-size: 11.5px;
-    line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 h2 {
