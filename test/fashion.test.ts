@@ -1,54 +1,81 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { buildCards, CARD, FRAME, frameAnimation } from "../src/card";
-import { LOOKS, WING_TEXTURES, WINGS } from "../src/game/looks";
+import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
 import { cleanName, NAME_MAX } from "../src/name";
 
-const directionCount = 8;
 const maxKeyframes = 32;
 const idleFrames = 15;
 const walkFrames = 8;
 const phaserBlendModes = { BlendModes: { NORMAL: 0, ADD: 1 } };
+const neutralFarTint = 0xb8b8b8;
+const cosmetics: Cosmetics = JSON.parse(readFileSync(new URL("./fixtures/cosmetics.json", import.meta.url), "utf8"));
+const codeStyles = createWingKit(phaserBlendModes).config;
 
-test("every look in the snapshot has idle and walk frames for all eight directions", () => {
-  const kit = createWingKit(phaserBlendModes);
-  assert.equal(kit.directions.length, directionCount);
-  for (const look of LOOKS) {
-    for (const anim of ["idle", "walk"]) {
-      for (const dir of kit.directions) {
-        const row = look.sheet.rows.find(
-          (r) => r.anim === anim && r.dir === dir,
-        );
-        assert.ok(row && row.count > 0, `${look.id} has no ${anim}/${dir}`);
+test("cosmetics.json turns every class and every outfit into a look with its game atlas", () => {
+  const plan = planCatalog(cosmetics, codeStyles);
+  const outfits = cosmetics.skins.filter((s) => s.slot === "outfit");
+  assert.equal(plan.looks.length, cosmetics.classes.length + outfits.length);
+  const ranger = plan.looks.find((l) => l.id === "outfit:silverwind_ranger");
+  assert.ok(ranger, "Silverwind Ranger is in the catalog");
+  assert.equal(ranger.classId, "archer");
+  assert.equal(ranger.className, "Archer");
+  assert.equal(ranger.source, "/jobs/silverwind-ranger-v1/player");
+  for (const look of plan.looks) {
+    if (look.kind === "outfit") assert.ok(plan.looks.some((l) => l.id === `class:${look.classId}`), `${look.id} has its class`);
+  }
+});
+
+test("wings take placement from cosmetics.json and their effect from the game's wing code", () => {
+  const plan = planCatalog(cosmetics, codeStyles);
+  const demon = plan.wings.find((w) => w.info.id === "demon_wings")!;
+  assert.equal(demon.style.aura, codeStyles.demon_wings.aura);
+  assert.equal(demon.style.far, codeStyles.demon_wings.far);
+  assert.equal(demon.style.rootX, cosmetics.skins.find((s) => s.id === "demon_wings")!.wings!.rootX);
+  assert.equal(demon.textures[demon.style.texture], `${LUMIVARA}/wings/demon-wings.png`);
+  assert.equal(demon.textures[demon.style.rim!], `${LUMIVARA}/wings/demon-wings-rim.png`);
+  assert.equal(demon.info.icon, `${LUMIVARA}/items/demon_wings.png`);
+  assert.deepEqual(plan.wingsWithoutEffect, []);
+});
+
+test("a wing the game's wing code does not know is listed and drawn with a neutral far tint", () => {
+  const unknown = { id: "aurora_wings", slot: "wings", name: "Aurora Wings", wings: { url: "/wings/aurora.png", rootX: 0.01, rootY: 0.6, scale: 0.5 } };
+  const plan = planCatalog({ ...cosmetics, skins: [...cosmetics.skins, unknown] }, codeStyles);
+  const aurora = plan.wings.find((w) => w.info.id === "aurora_wings")!;
+  assert.deepEqual(plan.wingsWithoutEffect, ["aurora_wings"]);
+  assert.equal(aurora.style.far, neutralFarTint);
+  assert.equal(aurora.style.aura, undefined);
+});
+
+test("cosmetics.json in a format the panel does not know is refused", () => {
+  assert.ok(isCosmetics(cosmetics));
+  assert.equal(isCosmetics({ ...cosmetics, format: 2 }), false);
+  assert.equal(isCosmetics(null), false);
+});
+
+test("a game atlas is laid out with one row per animation and direction, trimmed frames at their offsets", () => {
+  const directions = createWingKit(phaserBlendModes).directions;
+  const cell = { w: 64, h: 72 };
+  const counts = { idle: 3, walk: 2 };
+  const frames: AtlasJson["frames"] = {};
+  let x = 0;
+  for (const [anim, count] of Object.entries(counts)) {
+    for (const dir of directions) {
+      for (let i = 0; i < count; i++) {
+        frames[`${anim}/${dir}/${i}`] = { frame: { x, y: 0, w: 20, h: 30 }, trimmed: true, spriteSourceSize: { x: 5, y: 7 }, sourceSize: cell };
+        x += 20;
       }
     }
-    assert.ok(
-      look.sheet.baseline > 0 && look.sheet.baseline < look.sheet.cell.h,
-      look.id,
-    );
   }
-});
-
-test("every fashion outfit belongs to a class that also has its plain look", () => {
-  const classes = new Set(
-    LOOKS.filter((l) => l.kind === "class").map((l) => l.classId),
-  );
-  const outfits = LOOKS.filter((l) => l.kind === "outfit");
-  assert.ok(outfits.length > 0);
-  for (const outfit of outfits)
-    assert.ok(classes.has(outfit.classId), outfit.id);
-});
-
-test("every wing on sale has the game's wing style and its textures bundled", () => {
-  const kit = createWingKit(phaserBlendModes);
-  assert.ok(WINGS.length > 0);
-  for (const wing of WINGS) {
-    const style = kit.config[wing.id];
-    assert.ok(style, wing.id);
-    assert.ok(WING_TEXTURES[style.texture], `${wing.id} texture`);
-    if (style.rim) assert.ok(WING_TEXTURES[style.rim], `${wing.id} rim`);
-  }
+  const layout = layoutSheet({ frames }, directions);
+  assert.deepEqual(layout.cell, cell);
+  assert.equal(layout.baseline, cell.h - 16);
+  assert.equal(layout.rows.length, directions.length * 2);
+  assert.deepEqual(layout.size, { w: counts.idle * cell.w, h: directions.length * 2 * cell.h });
+  const walkSecond = layout.rows.findIndex((r) => r.anim === "walk" && r.dir === directions[1]);
+  assert.ok(layout.blits.some((b) => b.dx === cell.w + 5 && b.dy === walkSecond * cell.h + 7));
 });
 
 test("the game's own wing code runs outside the game and places every wing part in every direction", () => {
@@ -74,7 +101,7 @@ test("the game's own wing code runs outside the game and places every wing part 
       parts.push(p);
       return p;
     };
-    const textures = new Set<string>(Object.keys(WING_TEXTURES));
+    const textures = new Set<string>(plan.wings.flatMap((w) => Object.keys(w.textures)));
     const scene = {
       add: { sprite: part, rectangle: part },
       textures: {
@@ -93,8 +120,11 @@ test("the game's own wing code runs outside the game and places every wing part 
     return { scene, parts };
   }
 
+  const plan = planCatalog(cosmetics, codeStyles);
   const kit = createWingKit(phaserBlendModes);
-  for (const wing of WINGS) {
+  for (const id of Object.keys(kit.config)) delete kit.config[id];
+  Object.assign(kit.config, Object.fromEntries(plan.wings.map((w) => [w.info.id, w.style])));
+  for (const wing of plan.wings.map((w) => w.info)) {
     const { scene, parts } = createSceneWithFakeCanvasesAndTrackParts();
     const entity: Record<string, any> = Object.assign(
       {

@@ -1,6 +1,6 @@
 /// <reference types="phaser" />
 import { createWingKit } from "../src/game/wings.js";
-import type { Look } from "../src/game/types";
+import type { Look, WingStyle } from "../src/game/types";
 
 const WALK_FRAME_MS = 90;
 const IDLE_FRAME_MS = 180;
@@ -19,6 +19,13 @@ export const FLAP_PERIOD_MS = {
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
+export const CODE_WING_STYLES: Record<string, WingStyle> = { ...kit.config };
+
+/** Points the game's wing code at the wings the live catalog lists. */
+export function useWingStyles(styles: Record<string, WingStyle>): void {
+  for (const id of Object.keys(kit.config)) delete kit.config[id];
+  Object.assign(kit.config, styles);
+}
 
 export type Pose = { direction: string; walking: boolean };
 
@@ -80,8 +87,9 @@ export class Stage {
             frameHeight: look.sheet.cell.h,
           });
         }
-        for (const [key, b64] of Object.entries(wingTextures))
-          this.load.image(key, png(b64));
+        this.load.setCORS("anonymous");
+        for (const [key, url] of Object.entries(wingTextures))
+          this.load.image(key, url);
       }
 
       create() {

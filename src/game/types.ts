@@ -19,7 +19,12 @@ export type Look = {
   sheet: Sheet;
 };
 
-export type WingInfo = { id: string; name: string; description: string };
+export type WingInfo = {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+};
 
 export type WingStyle = {
   texture: string;
@@ -27,6 +32,9 @@ export type WingStyle = {
   rootX: number;
   rootY: number;
   scale: number;
+  drop?: number;
+  far?: number;
+  aura?: string;
   rim?: string;
   rimUrl?: string;
 };

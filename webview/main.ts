@@ -1,6 +1,5 @@
 import { FRAME, PLATE_COLOR } from "../src/card";
-import { ITEM_ICONS, LOOKS, WING_TEXTURES, WINGS } from "../src/game/looks";
-import type { Look } from "../src/game/types";
+import type { Look, WingInfo } from "../src/game/types";
 import type {
   CardPayload,
   DriverToWebview,
@@ -8,7 +7,8 @@ import type {
 } from "../src/messages";
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameTag, loadNameFont, styleNameTag } from "./nametag";
-import { DIRECTIONS, FLAP_PERIOD_MS, Stage, type Backdrop } from "./stage";
+import { loadCatalog, type Catalog } from "./live";
+import { CODE_WING_STYLES, DIRECTIONS, FLAP_PERIOD_MS, Stage, useWingStyles, type Backdrop } from "./stage";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const STAGE_NATIVE = { w: 118, h: 88, feet: { x: 59, y: 71 } };
@@ -28,13 +28,15 @@ const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
 let exporter: Stage | null = null;
 const root = document.getElementById("root")!;
 
-const CLASS_LOOKS = LOOKS.filter((l) => l.kind === "class");
-const OUTFITS = LOOKS.filter((l) => l.kind === "outfit");
+let catalog: Catalog;
+let CLASS_LOOKS: Look[] = [];
+let OUTFITS: Look[] = [];
+let WINGS: WingInfo[] = [];
 const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === classId);
 
-let classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
-let outfitId: string | null = OUTFITS[0]?.id ?? null;
-let wingsId: string | null = WINGS[0]?.id ?? null;
+let classId = "";
+let outfitId: string | null = null;
+let wingsId: string | null = null;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let walking = false;
 let autoTurn = true;
@@ -248,8 +250,8 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
     width: EXPORT_NATIVE.w,
     height: EXPORT_NATIVE.h,
     feet: EXPORT_NATIVE.feet,
-    looks: LOOKS,
-    wingTextures: WING_TEXTURES,
+    looks: catalog.looks,
+    wingTextures: catalog.wingTextures,
     backdrop: cardBackdrop,
   });
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
@@ -317,12 +319,7 @@ function build(): void {
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
   root.replaceChildren(
-    h(
-      "header",
-      { class: "brand" },
-      h("span", {}, "LUMIVARA"),
-      h("h1", {}, "ห้องแต่งตัว"),
-    ),
+    brand(),
     h(
       "div",
       { class: "stage" },
@@ -372,6 +369,7 @@ function build(): void {
         maxLength: NAME_MAX,
         autocomplete: "off",
         placeholder: "พิมพ์ชื่อในเกมของคุณ",
+        value: playerName,
         oninput: onNameInput,
       }),
     ),
@@ -416,9 +414,9 @@ function build(): void {
               renderLabels();
             },
           },
-          ITEM_ICONS[w.id] &&
+          w.icon &&
             h("img", {
-              src: png(ITEM_ICONS[w.id]),
+              src: w.icon,
               alt: "",
               width: 36,
               height: 36,
@@ -455,8 +453,8 @@ function build(): void {
     width: STAGE_NATIVE.w,
     height: STAGE_NATIVE.h,
     feet: STAGE_NATIVE.feet,
-    looks: LOOKS,
-    wingTextures: WING_TEXTURES,
+    looks: catalog.looks,
+    wingTextures: catalog.wingTextures,
     backdrop: stageBackdrop,
     frame: (now) => {
       if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
@@ -494,16 +492,53 @@ function build(): void {
   host.addEventListener("pointercancel", endDrag);
 
   renderPickers();
+  renderName();
+}
+
+const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
+
+async function boot(): Promise<void> {
+  const fill = h("span", { class: "boot-fill" });
+  const text = h("p", {}, "กำลังโหลดชุดจาก Lumivara…");
+  root.replaceChildren(brand(), h("div", { class: "boot" }, text, h("div", { class: "boot-bar" }, fill)));
+  try {
+    catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) => {
+      fill.style.width = `${total ? (done / total) * 100 : 0}%`;
+      text.textContent = `กำลังโหลดชุดจาก Lumivara… ${done}/${total}`;
+    });
+  } catch (err) {
+    root.replaceChildren(
+      brand(),
+      h(
+        "div",
+        { class: "boot" },
+        h("p", {}, "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
+        h("p", { class: "boot-detail" }, err instanceof Error ? err.message : String(err)),
+        h("button", { type: "button", class: "primary", onclick: () => void boot() }, "ลองอีกครั้ง"),
+      ),
+    );
+    return;
+  }
+  useWingStyles(catalog.styles);
+  CLASS_LOOKS = catalog.looks.filter((l) => l.kind === "class");
+  OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
+  WINGS = catalog.wings;
+  classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
+  outfitId = OUTFITS[0]?.id ?? null;
+  wingsId = WINGS[0]?.id ?? null;
+  build();
 }
 
 api.onMessage((raw) => {
   const message = raw as DriverToWebview;
   if (message.type === "profile") {
-    const input = document.getElementById("name-input") as HTMLInputElement;
-    if (input.value || !message.name) return;
+    const input = document.getElementById("name-input") as HTMLInputElement | null;
+    if (!message.name || (input ? input.value : playerName)) return;
     playerName = cleanName(message.name);
-    input.value = playerName;
-    renderName();
+    if (input) {
+      input.value = playerName;
+      renderName();
+    }
   } else if (message.type === "placed") {
     setBusy(false);
     setStatus(message.count > 1 ? `วางครบ ${message.count} ชุดแล้ว` : "วางลงบอร์ดแล้ว");
@@ -513,5 +548,5 @@ api.onMessage((raw) => {
   }
 });
 
-build();
 send({ type: "ready" });
+void boot();

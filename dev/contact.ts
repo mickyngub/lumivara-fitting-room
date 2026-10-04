@@ -1,9 +1,11 @@
 import PhaserLib from "phaser";
-import { LOOKS, WING_TEXTURES, WINGS } from "../src/game/looks";
 import type { Look } from "../src/game/types";
 
 (window as unknown as { Phaser: unknown }).Phaser = PhaserLib;
-const { DIRECTIONS, Stage } = await import("../webview/stage");
+const { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles } = await import("../webview/stage");
+const { loadCatalog } = await import("../webview/live");
+const { looks: LOOKS, wings: WINGS, styles, wingTextures } = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, () => {});
+useWingStyles(styles);
 
 const CELL = { w: 84, h: 72 };
 const FEET = { x: 42, y: 64 };
@@ -28,7 +30,7 @@ const stage = new Stage({
   height: CELL.h,
   feet: FEET,
   looks: LOOKS,
-  wingTextures: WING_TEXTURES,
+  wingTextures,
   backdrop: (ctx, width, height) => {
     ctx.fillStyle = GRASS;
     ctx.fillRect(0, 0, width, height);
