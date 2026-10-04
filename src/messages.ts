@@ -2,6 +2,7 @@ export type CardPayload = {
   title: string;
   plate?: string;
   frame?: ArrayBuffer;
+  frameStyle?: string;
   frames: ArrayBuffer[];
   loopMs: number;
 };

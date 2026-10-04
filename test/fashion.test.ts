@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildCards, CARD, FRAME, frameAnimation, LOGO_BOX } from "../src/card";
-import { DRAWDY_SYMBOL } from "../src/brand-icons";
+import { buildCards, CARD, cardBottom, FRAME, frameAnimation, LOGO_GAP } from "../src/card";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
 import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
@@ -198,11 +197,11 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name under the picture and the Drawdy symbol in its bottom-right corner, clear of every frame", () => {
+test("a card shows its class name between the picture and the frame, and the Drawdy symbol tucked into the bottom-right corner of every frame", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
   const overlay = new ArrayBuffer(1);
-  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1, frame: overlay }], { x: 0, y: 0 }, generateIdInSequence);
+  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1, frame: overlay, frameStyle: "silver" }], { x: 0, y: 0 }, generateIdInSequence);
   type Box = { type: string; x: number; y: number; width: number; height: number; text?: string };
   const boxes = elements as unknown as Box[];
   const labels = boxes.filter((e) => e.text);
@@ -210,22 +209,27 @@ test("a card shows its class name under the picture and the Drawdy symbol in its
     labels.map((l) => l.text),
     ["Merchant"],
   );
-  assert.ok(labels[0].y >= CARD.pad + FRAME.h, "the title overlaps the picture");
   assert.ok(boxes.some((e) => e.type === "image" && e.x === 0 && e.y === 0 && e.width === CARD.w && e.height === CARD.h), "frame overlay covers the card");
   const logos = boxes.filter((e) => e.type === "image" && e.y >= CARD.pad + FRAME.h);
   assert.equal(logos.length, 1);
-  const [logo] = logos;
-  assert.ok(logo.x > CARD.w / 2 && logo.y > labels[0].y, "the symbol sits bottom right");
-  assert.ok(logo.height >= 16, "the symbol is under the logo pack's 16 px minimum");
-  const clear = DRAWDY_SYMBOL.clear;
-  const { scale, w } = FRAME_GRID;
+  assert.deepEqual([logos[0].x, logos[0].y], [cardBottom("silver").logo.x, cardBottom("silver").logo.y]);
+  const { scale, w, h } = FRAME_GRID;
   for (const style of FRAME_STYLES) {
     const px = paintFrame(style);
-    for (let y = Math.floor((LOGO_BOX.y - clear) / scale); y < Math.ceil((LOGO_BOX.y + LOGO_BOX.h + clear) / scale); y++) {
-      for (let x = Math.floor((LOGO_BOX.x - clear) / scale); x < Math.ceil((LOGO_BOX.x + LOGO_BOX.w + clear) / scale); x++) {
-        assert.equal(px.data[(y * w + x) * 4 + 3], 0, `${style.id} frame is inside the symbol's clear space at ${x},${y}`);
+    const { title, logo } = cardBottom(style.id);
+    const band = CARD.h - style.band * scale;
+    assert.ok(title.y >= CARD.pad + FRAME.h && title.y + title.h <= band, `${style.id} title leaves the strip under the picture`);
+    assert.ok(logo.h >= 16, "the symbol is under the logo pack's 16 px minimum");
+    const touchesFrame = (dx: number, dy: number) => {
+      for (let y = Math.floor((logo.y + dy - LOGO_GAP) / scale); y < Math.ceil((logo.y + dy + logo.h + LOGO_GAP) / scale); y++) {
+        for (let x = Math.floor((logo.x + dx - LOGO_GAP) / scale); x < Math.ceil((logo.x + dx + logo.w + LOGO_GAP) / scale); x++) {
+          if (x >= w || y >= h || px.data[(y * w + x) * 4 + 3]) return true;
+        }
       }
-    }
+      return false;
+    };
+    assert.equal(touchesFrame(0, 0), false, `${style.id} frame comes within one art pixel of the symbol`);
+    assert.ok(touchesFrame(1, 0) && touchesFrame(0, 1), `${style.id} symbol could sit further into the corner`);
   }
 });
 

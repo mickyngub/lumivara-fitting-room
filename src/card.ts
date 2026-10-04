@@ -2,11 +2,12 @@ import type {
   DrawdyElementSchema,
   LocalAnimation,
 } from "@drawdy/driver-protocol";
+import { FRAME_GRID, frameById, paintFrame } from "./art/frames";
 import { DRAWDY_SYMBOL, DRAWDY_SYMBOL_PNG, pngBytes } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
 export const FRAME = { w: 336, h: 320 };
-export const CARD = { w: 384, h: 444, gap: 32, pad: 24 };
+export const CARD = { w: FRAME_GRID.w * FRAME_GRID.scale, h: FRAME_GRID.h * FRAME_GRID.scale, gap: 32, pad: 24 };
 // A frame overlay is drawn on a 4x grid and has rounded pixel corners; the
 // plate sits one grid pixel inside it so it never shows past them.
 const PLATE_INSET = 4;
@@ -15,16 +16,54 @@ export const PLATE_COLOR = "#16295a";
 const GOLD = "#c9a45c";
 const GOLD_DARK = "#7d6636";
 const PARCHMENT = "#f7f0de";
-// Frame corner ornaments reach 28 px in from the card's edges and the
-// thickest band 20 px; the logo keeps its clear space from both.
-const ORNAMENT_REACH = 28;
-const BAND_MAX = 20;
-export const LOGO_BOX = {
-  x: CARD.w - ORNAMENT_REACH - DRAWDY_SYMBOL.clear - DRAWDY_SYMBOL.w,
-  y: CARD.h - BAND_MAX - DRAWDY_SYMBOL.clear - DRAWDY_SYMBOL.h,
-  w: DRAWDY_SYMBOL.w,
-  h: DRAWDY_SYMBOL.h,
-};
+// The frame's line around the picture is one grid pixel thick.
+const STRIP_TOP = CARD.pad + FRAME.h + FRAME_GRID.scale;
+const TITLE = { h: 36, fontSize: 26 };
+// One art pixel, less than the logo pack's 43% clear space, so the logo sits
+// in the corner as asked.
+export const LOGO_GAP = FRAME_GRID.scale;
+const PLAIN_INSET = 6;
+
+type Box = { x: number; y: number; w: number; h: number };
+
+/** The title centred between the picture and the frame's bottom band, and the logo as far into the bottom-right corner as the frame allows. */
+export function cardBottom(frameStyle?: string): { title: Box; logo: Box } {
+  const { w, h } = DRAWDY_SYMBOL;
+  const titleAbove = (edge: number): Box => ({
+    x: CARD.pad,
+    y: (STRIP_TOP + edge) / 2 - TITLE.h / 2,
+    w: CARD.w - CARD.pad * 2,
+    h: TITLE.h,
+  });
+  if (!frameStyle) {
+    return {
+      title: titleAbove(CARD.h - PLAIN_INSET),
+      logo: { x: CARD.w - CARD.pad - w, y: CARD.h - CARD.pad - h, w, h },
+    };
+  }
+  const style = frameById(frameStyle);
+  const px = paintFrame(style);
+  const { scale } = FRAME_GRID;
+  const clear = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = Math.floor(y0 / scale); y < Math.ceil(y1 / scale); y++) {
+      for (let x = Math.floor(x0 / scale); x < Math.ceil(x1 / scale); x++) {
+        if (px.data[(y * FRAME_GRID.w + x) * 4 + 3]) return false;
+      }
+    }
+    return true;
+  };
+  let logo: Box = { x: 0, y: 0, w, h };
+  for (let bottom = CARD.h - LOGO_GAP; bottom >= STRIP_TOP + h; bottom--) {
+    for (let right = CARD.w - LOGO_GAP; right >= CARD.w / 2 + w; right--) {
+      if (
+        right + bottom > logo.x + logo.y + w + h &&
+        clear(right - w - LOGO_GAP, bottom - h - LOGO_GAP, right + LOGO_GAP, bottom + LOGO_GAP)
+      )
+        logo = { x: right - w, y: bottom - h, w, h };
+    }
+  }
+  return { title: titleAbove(CARD.h - style.band * scale), logo };
+}
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross
 // full opacity within 0.1% of a step, so frames swap with hard cuts.
@@ -166,12 +205,13 @@ export function buildCards(
       );
     }
 
-    label(CARD.pad + FRAME.h + 4, 36, card.title, 26, PARCHMENT);
+    const { title, logo } = cardBottom(card.frame ? card.frameStyle : undefined);
+    label(title.y, title.h, card.title, TITLE.fontSize, PARCHMENT);
     elements.push({
       type: "image",
       drawdyElementId: generateId(),
       groupId,
-      ...box(LOGO_BOX.x, LOGO_BOX.y, LOGO_BOX.w, LOGO_BOX.h),
+      ...box(logo.x, logo.y, logo.w, logo.h),
       blob: new Blob([pngBytes(DRAWDY_SYMBOL_PNG)], { type: "image/png" }),
     });
   });

@@ -440,7 +440,7 @@ async function placeLook(): Promise<void> {
     const l = look();
     const { frames, loopMs } = await exportFrames(l);
     const frame = await frameOverlay();
-    const card: CardPayload = { title: l.className, plate: background().plate, frames, loopMs, ...(frame ? { frame } : {}) };
+    const card: CardPayload = { title: l.className, plate: background().plate, frames, loopMs, ...(frame ? { frame, frameStyle: frameId } : {}) };
     send({ type: "place", cards: [card] }, [...frames, ...(frame ? [frame] : [])]);
   } catch (err) {
     setBusy(false);
