@@ -1,33 +1,62 @@
-# Lumivara Fitting Room
+# Lumivara Fitting Room · ห้องแต่งตัว Lumivara
 
-Try every Lumivara Online outfit and wing on your own character before you buy, then put it on your Drawdy board to share with friends.
+ลองชุดแฟชั่นและปีกของ Lumivara Online บนตัวละครของคุณก่อนซื้อ แล้ววางการ์ดตัวละครที่ขยับได้ลงบอร์ด Drawdy ให้เพื่อนดู
 
-1. Open the Fitting Room from the Lumivara button in the extension bar.
-2. Pick your class, then its plain look or one of its fashion outfits (outfits are made for one class, as in the game).
-3. Pick wings. Drag the character or use the arrows to turn it, and tap ลองเดิน to see it walk.
-4. Pick a background under the preview: a colour, or an animated pixel-art scene (aurora, starfield, magic circle, embers, sakura) that loops with your card.
-5. Type your in-game name (the same green name tag as in the game), pick a card frame, then tap ✦ วางลงบอร์ด to place an animated character card on the board.
+## วิธีใช้
 
-The fashion list, sprites, icons and wings load live from lumivaraonline.com every time the panel opens, so new items show up without an update.
+1. ติดตั้งแล้วห้องแต่งตัวจะเปิดขึ้นเอง ครั้งต่อไปกดไอคอน Lumivara ที่แถบด้านขวาของบอร์ด
+2. รอโหลดชุดจากเกมสักครู่ แล้วลากที่ตัวละครหรือกดลูกศรเพื่อหมุนดูรอบตัว
+3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพของมัน เหมือนในเกม)
+4. เลือกปีก และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
+5. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
+6. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้: ออโรร่า ห้วงดาว วงเวท ประกายไฟ ซากุระ) และกรอบการ์ด
+7. กด ✦ วางลงบอร์ด การ์ดจะขยับวนได้เหมือนในเกม วางได้หลายใบ แล้วกด “แชร์” เพื่อส่งลิงก์ให้เพื่อน
 
-ลองชุดแฟชั่นและปีกทุกแบบของ Lumivara Online บนตัวละครของคุณก่อนซื้อ เลือกอาชีพ ชุด และปีก ดูตัวละครเดินและหมุนรอบตัว ใส่ป้ายชื่อในเกม แล้ววางการ์ดตัวละครลงบอร์ดแชร์ให้เพื่อนดู
+ชื่อ พื้นหลัง และกรอบที่เลือกจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร และปีกโหลดสดจาก lumivaraonline.com ทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
+
+## In English
+
+Try every Lumivara Online outfit and wing on your own character before you buy, then put an animated character card on your Drawdy board to share with friends.
+
+1. After installing, the Fitting Room opens on its own; next time, open it from the Lumivara button on the right of the board.
+2. Drag the character or use the arrows to turn it around.
+3. Pick a class, then its plain look or one of its fashion outfits (outfits belong to one class, as in the game), then wings.
+4. Pick a pose: idle, walk, attack, attack 2 or sit (mages can also cast).
+5. Type your in-game name: it shows under the character with your class, like the game's name tag.
+6. Pick a background (a colour or an animated pixel-art scene) and a card frame, then tap ✦ วางลงบอร์ด.
+
+## Permissions
+
+| Permission | Why |
+| --- | --- |
+| Interface | the Lumivara button and the Fitting Room panel |
+| Canvas | placing character cards on your board |
+| Local storage | remembering your name, background and frame in this browser |
+
+The extension sends nothing anywhere. It only downloads the game's public fashion data and art from `lumivaraonline.com`.
 
 ## How it works
 
-- Nothing about the fashion is bundled. Every time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits and wings with names, descriptions, icons, atlas paths and wing placement) and builds each look's sprite sheet in the browser from the game's own atlases (`/jobs/<look>/player.png|json`, `/novice-v6/`): idle and walk frames, all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs. If the game cannot be reached the panel says so and offers a retry; there is no offline copy.
-- Rendering uses the game's own engine. The panel embeds Phaser 3.90 (the version the game ships, MIT licence) and draws at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scales the canvas up. A canvas-2D imitation was tried first; compared pixel by pixel against real Phaser it differed on 144 to 922 pixels per pose from texel sampling, so it was replaced.
-- Wings are animated by the game's own code, the one thing that is bundled: code cannot be loaded live (the game's scripts carry no CORS header, and running downloaded code is not allowed). `scripts/wing-code.mjs` lifts the player class's `setWings`, `drawWings` and `wingParts` methods plus every module-level binding they use into `src/game/wings.js`. Placement comes from `cosmetics.json`; the effect (`aura`, far-wing tint `far`) comes from this code, so a wing the code does not know draws with default sparkles until `cosmetics.json` carries `aura` and `far` or the code is lifted again. The body sprite, its feet anchor and the shadow (`ellipse 25×9, #122018, 0.4`) match the game's player drawing.
-- Board cards bake the background into every frame, so a still render (a selected card, a thumbnail) shows one clean pose. Animated backgrounds and card frames are pixel art on the sprites' own 4x grid (`src/art/`); every effect is periodic over the card's loop (the wing flap: 2.6 s idle, 0.8 s walking), so cards loop without a seam.
+- Nothing about the fashion is bundled. Each time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits and wings with names, icons, atlas paths and wing placement) and builds each look's sprite sheet in the browser from the game's own atlases: idle, walk and every action pose the atlas has, in all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs. If the game cannot be reached the panel says so and offers a retry.
+- Characters are drawn with the game's own engine, Phaser 3.90, at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scaled up, so they match the game pixel for pixel.
+- Wings move with the game's own wing code (`src/game/wings.js`, lifted from the game client by `scripts/wing-code.mjs`); placement comes from `cosmetics.json`.
+- A card is a frame overlay plus up to 15 picture frames that Drawdy plays in a loop. The background, name tag and Drawdy mark are baked into every frame, so a still render shows one clean pose. Animated backgrounds and frames are pixel art on the sprites' 4x grid (`src/art/`) and loop without a seam.
+
+## Credits
+
+Characters, outfits, wings and their animation are from [Lumivara Online](https://lumivaraonline.com) and load live from the game's site. Rendering uses [Phaser](https://phaser.io) 3.90 (MIT).
 
 ## Development
 
 ```bash
 npm install
-npm run check-wings  # is the bundled wing code still the game's? also lists wings in cosmetics.json it has no effect for
-npm run wing-code    # lift the wing code again after a game update
 npm test
-npm run dev        # dev server on :5182; in Drawdy run ⌘K → "Add extension dev server" on a local board
-npm run build      # dist/drawdy-lumivara-fashion.drawdyx
+npm run dev          # dev server on :5182; in Drawdy run ⌘K → "Add extension dev server" on a local board
+npm run build        # regenerates src/webview-html.ts and dist/*.drawdyx
+npm run check-wings  # is the bundled wing code still the game's?
+npm run wing-code    # lift the wing code again after a game update
 ```
 
-`dev/contact.ts` renders every wing and outfit in all eight directions as one sheet for visual checks. With `npm run dev` running, open `http://localhost:5182/version` in a browser and run `import("/dev/contact.ts")` in its console.
+Drawdy builds published versions from this repository's `src/index.ts`, so commit `src/webview-html.ts` after `npm run build`. Bump `driverVersion` in `manifest.json` for every release and add it to `CHANGELOG.md`.
+
+`dev/contact.ts` renders every wing and outfit in all eight directions as one sheet for visual checks: with `npm run dev` running, open `http://localhost:5182/version` and run `import("/dev/contact.ts")` in the console.

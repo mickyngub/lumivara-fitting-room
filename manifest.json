@@ -1,9 +1,13 @@
 {
-    "driverId": "drawdy.lumivara-fashion",
+    "driverId": "mickyngub.lumivara-fitting-room",
     "driverName": "Lumivara Fitting Room",
-    "driverVersion": "0.1.0",
-    "description": "Try every Lumivara Online outfit and wing on your own character before you buy. Pick a class, an outfit and wings, watch your character walk and turn with the game's own art and wing animation, add your in-game name tag, then place an animated character card on the board to share with friends. Always current: fashion loads live from the game. ลองชุดแฟชั่นและปีกทุกแบบของ Lumivara Online บนตัวละครของคุณก่อนซื้อ ใส่ป้ายชื่อ แล้ววางการ์ดตัวละครลงบอร์ดแชร์ให้เพื่อนดู",
+    "driverVersion": "1.0.0",
+    "description": "ลองชุดแฟชั่นและปีกของ Lumivara Online บนตัวละครของคุณก่อนซื้อ เลือกอาชีพ ชุด ปีก และท่าทาง ใส่ชื่อในเกม เลือกพื้นหลังและกรอบ แล้ววางการ์ดตัวละครที่ขยับได้ลงบอร์ดให้เพื่อนดู · Try Lumivara Online outfits and wings on your own character before you buy: pick a class, outfit, wings and pose, add your in-game name, choose a background and frame, then place an animated character card on the board. Art loads live from lumivaraonline.com.",
     "icon": "icon.png",
     "main": "main.js",
-    "permissions": ["dom", "scene", "storage"]
+    "permissions": [
+        "dom",
+        "scene",
+        "storage"
+    ]
 }
