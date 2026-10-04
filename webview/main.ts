@@ -289,7 +289,7 @@ async function placeLooks(looks: Look[]): Promise<void> {
     const cards: CardPayload[] = [];
     for (const l of looks) {
       const { frames, loopMs } = await exportFrames(l);
-      cards.push({ title: l.name, subtitle: subtitleFor(l), frames, loopMs });
+      cards.push({ title: l.className, frames, loopMs });
     }
     send(
       { type: "place", cards },

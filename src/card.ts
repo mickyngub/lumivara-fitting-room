@@ -2,17 +2,20 @@ import type {
   DrawdyElementSchema,
   LocalAnimation,
 } from "@drawdy/driver-protocol";
+import { DRAWDY_ICON_PNG, LUMIVARA_ICON_PNG, pngBytes } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
 export const FRAME = { w: 336, h: 320 };
-export const CARD = { w: 360, h: 438, gap: 32, pad: 12 };
+export const CARD = { w: 360, h: 420, gap: 32, pad: 12 };
 export const PLATE_COLOR = "#16295a";
 
 const GOLD = "#c9a45c";
 const GOLD_DARK = "#7d6636";
 const PARCHMENT = "#f7f0de";
-const FAINT = "#7f8bb0";
-const FOOTER = "Lumivara Online · ห้องแต่งตัว";
+const MUTED = "#a9b6d8";
+// textWidth is the line measured in SourGummy, the board's text font, so the
+// two logos sit right beside it.
+const FOOTER = { text: "Lumivara × Drawdy", fontSize: 13, textWidth: 115.39, icon: 22, gap: 7 };
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross
 // full opacity within 0.1% of a step, so frames swap with hard cuts.
@@ -129,9 +132,19 @@ export function buildCards(
     }
 
     const below = CARD.pad + FRAME.h + 8;
-    label(below, 34, card.title, 24, PARCHMENT);
-    label(below + 34, 24, card.subtitle, 15, GOLD);
-    label(below + 64, 20, FOOTER, 11, FAINT);
+    label(below, 36, card.title, 26, PARCHMENT);
+    const footerY = below + 44;
+    label(footerY, FOOTER.icon, FOOTER.text, FOOTER.fontSize, MUTED);
+    const icon = (dx: number, png: string) =>
+      elements.push({
+        type: "image",
+        drawdyElementId: generateId(),
+        groupId,
+        ...box(dx, footerY, FOOTER.icon, FOOTER.icon),
+        blob: new Blob([pngBytes(png)], { type: "image/png" }),
+      });
+    icon(CARD.w / 2 - FOOTER.textWidth / 2 - FOOTER.gap - FOOTER.icon, LUMIVARA_ICON_PNG);
+    icon(CARD.w / 2 + FOOTER.textWidth / 2 + FOOTER.gap, DRAWDY_ICON_PNG);
   });
 
   return { elements, animations };

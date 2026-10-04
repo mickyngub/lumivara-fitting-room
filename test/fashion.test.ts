@@ -175,19 +175,23 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("card labels sit below the name tag frame and inside the card plate", () => {
+test("a card shows its class name and a Lumivara × Drawdy footer with both logos inside the plate", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
-  const { elements } = buildCards(
-    [{ title: "Azure Kensei", subtitle: "Kensei", frames: [new ArrayBuffer(1)], loopMs: 1 }],
-    { x: 0, y: 0 },
-    generateIdInSequence,
+  const { elements } = buildCards([{ title: "Merchant", frames: [new ArrayBuffer(1)], loopMs: 1 }], { x: 0, y: 0 }, generateIdInSequence);
+  type Box = { type: string; x: number; y: number; width: number; height: number; text?: string; blob?: Blob };
+  const boxes = elements as unknown as Box[];
+  const labels = boxes.filter((e) => e.text);
+  assert.deepEqual(
+    labels.map((l) => l.text),
+    ["Merchant", "Lumivara × Drawdy"],
   );
-  type Label = { y: number; height: number; text: string };
-  const labels = elements.filter((e) => "text" in e && e.text) as unknown as Label[];
-  assert.equal(labels.length, 3);
-  for (const label of labels) {
-    assert.ok(label.y >= CARD.pad + FRAME.h, `${label.text} overlaps the frame`);
-    assert.ok(label.y + label.height <= CARD.h - CARD.pad, `${label.text} leaves the card`);
+  const footer = labels[1];
+  const logos = boxes.filter((e) => e.type === "image" && e.y === footer.y);
+  assert.equal(logos.length, 2);
+  for (const box of [...labels, ...logos]) {
+    assert.ok(box.y >= CARD.pad + FRAME.h, `${box.text ?? "logo"} overlaps the frame`);
+    assert.ok(box.y + box.height <= CARD.h - CARD.pad, `${box.text ?? "logo"} leaves the card`);
+    assert.ok(box.x >= CARD.pad && box.x + box.width <= CARD.w - CARD.pad, `${box.text ?? "logo"} leaves the card sideways`);
   }
 });

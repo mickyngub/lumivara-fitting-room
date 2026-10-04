@@ -1,6 +1,5 @@
 export type CardPayload = {
   title: string;
-  subtitle: string;
   frames: ArrayBuffer[];
   loopMs: number;
 };
