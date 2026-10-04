@@ -22,10 +22,10 @@ export type FrameStyle = {
 
 /** The card on a 4x grid, the same pixel size as the characters in its frames. */
 export const FRAME_GRID = {
-  w: 96,
-  h: 103,
+  w: 104,
+  h: 111,
   scale: 4,
-  picture: { x: 6, y: 6, w: 84, h: 80 },
+  picture: { x: 6, y: 6, w: 92, h: 88 },
 };
 const RADIUS = 4;
 

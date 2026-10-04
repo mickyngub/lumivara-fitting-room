@@ -6,8 +6,13 @@ import { FRAME_GRID, frameById, paintFrame } from "./art/frames";
 import { DRAWDY_SYMBOL, DRAWDY_SYMBOL_PNG, pngBytes } from "./brand-icons";
 import type { CardPayload } from "./messages";
 
-export const FRAME = { w: 336, h: 320 };
-export const CARD = { w: FRAME_GRID.w * FRAME_GRID.scale, h: FRAME_GRID.h * FRAME_GRID.scale, gap: 32, pad: 24 };
+export const FRAME = { w: FRAME_GRID.picture.w * FRAME_GRID.scale, h: FRAME_GRID.picture.h * FRAME_GRID.scale };
+export const CARD = {
+  w: FRAME_GRID.w * FRAME_GRID.scale,
+  h: FRAME_GRID.h * FRAME_GRID.scale,
+  gap: 32,
+  pad: FRAME_GRID.picture.x * FRAME_GRID.scale,
+};
 // A frame overlay is drawn on a 4x grid and has rounded pixel corners; the
 // plate sits one grid pixel inside it so it never shows past them.
 const PLATE_INSET = 4;
@@ -26,7 +31,7 @@ const PLAIN_INSET = 6;
 
 type Box = { x: number; y: number; w: number; h: number };
 
-/** The title centred between the picture and the frame's bottom band, and the logo as far into the bottom-right corner as the frame allows. */
+/** The title centred between the picture and the frame's bottom band, and the logo in the bottom-right corner, as far from the right band as from the bottom one. */
 export function cardBottom(frameStyle?: string): { title: Box; logo: Box } {
   const { w, h } = DRAWDY_SYMBOL;
   const titleAbove = (edge: number): Box => ({
@@ -52,17 +57,13 @@ export function cardBottom(frameStyle?: string): { title: Box; logo: Box } {
     }
     return true;
   };
-  let logo: Box = { x: 0, y: 0, w, h };
-  for (let bottom = CARD.h - LOGO_GAP; bottom >= STRIP_TOP + h; bottom--) {
-    for (let right = CARD.w - LOGO_GAP; right >= CARD.w / 2 + w; right--) {
-      if (
-        right + bottom > logo.x + logo.y + w + h &&
-        clear(right - w - LOGO_GAP, bottom - h - LOGO_GAP, right + LOGO_GAP, bottom + LOGO_GAP)
-      )
-        logo = { x: right - w, y: bottom - h, w, h };
-    }
-  }
-  return { title: titleAbove(CARD.h - style.band * scale), logo };
+  const band = style.band * scale;
+  let inset = LOGO_GAP;
+  while (!clear(CARD.w - band - inset - w - LOGO_GAP, CARD.h - band - inset - h - LOGO_GAP, CARD.w - band - inset + LOGO_GAP, CARD.h - band - inset + LOGO_GAP)) inset++;
+  return {
+    title: titleAbove(CARD.h - band),
+    logo: { x: CARD.w - band - inset - w, y: CARD.h - band - inset - h, w, h },
+  };
 }
 
 // Each frame owns two animation steps; values far above 1 make the ramp cross

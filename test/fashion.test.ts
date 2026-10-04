@@ -197,7 +197,7 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card shows its class name between the picture and the frame, and the Drawdy symbol tucked into the bottom-right corner of every frame", () => {
+test("a card shows its class name between the picture and the frame, and the Drawdy symbol in the bottom-right corner of every frame, as far from the right band as the bottom one", () => {
   let seq = 0;
   const generateIdInSequence = () => String(seq++);
   const overlay = new ArrayBuffer(1);
@@ -229,7 +229,8 @@ test("a card shows its class name between the picture and the frame, and the Dra
       return false;
     };
     assert.equal(touchesFrame(0, 0), false, `${style.id} frame comes within one art pixel of the symbol`);
-    assert.ok(touchesFrame(1, 0) && touchesFrame(0, 1), `${style.id} symbol could sit further into the corner`);
+    assert.ok(touchesFrame(1, 1), `${style.id} symbol could sit further into the corner`);
+    assert.ok(Math.abs(CARD.w - style.band * scale - (logo.x + logo.w) - (band - (logo.y + logo.h))) < 1e-9, `${style.id} symbol is closer to one band than the other`);
   }
 });
 
