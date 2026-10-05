@@ -3,7 +3,8 @@ export type WingSize = "s" | "m" | "l";
 /** A wing made from the player's own image: the cut-out PNG and how it is worn. */
 export type SavedWing = { id: string; png: string; aura: WingAura; size: WingSize; flip: boolean };
 
-export const MAX_OWN_WINGS = 8;
+// A guard against runaway data rather than a real limit: each wing is a few KB in the browser's own storage.
+export const MAX_OWN_WINGS = 100;
 
 // A saved wing is a small PNG; anything much bigger was not made by the panel.
 const MAX_SAVED_WING = 120_000;
