@@ -634,10 +634,10 @@ function buildLayout(): void {
     h(
       "div",
       { id: "wing-tray", class: "wing-tray", hidden: true },
-      h("p", { class: "wing-tray-head" }, h("span", { id: "wing-tray-title" }), customNote()),
+      h("p", { class: "wing-tray-head" }, h("span", { id: "wing-tray-title" })),
       h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
     ),
-    h("h2", {}, "เครื่องประดับ ", customNote()),
+    h("h2", {}, "เครื่องประดับ"),
     h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ" }),
     h(
       "div",
@@ -864,8 +864,6 @@ function setWingDye(hex: string | null): void {
   syncWingDyes();
 }
 
-// Wing colours and accessories are the fitting room's own, so players don't look for them in the Item Mall.
-const customNote = () => h("small", { class: "custom-note" }, "ออกแบบเอง · ไม่มีในเกม");
 
 const ACCESSORY_THUMB = { size: 36, headW: 16 };
 

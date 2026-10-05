@@ -10,7 +10,7 @@
 2. รอโหลดชุดจากเกมสักครู่ แล้วลากที่ตัวละครหรือกดลูกศรเพื่อหมุนดูรอบตัว
 3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพที่ชุดนั้นรองรับ เหมือนในเกม)
 4. เลือกปีกและสีปีก (7 สี หรือเลือกสีเอง) และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
-5. ใส่เครื่องประดับได้ 1 ชิ้น: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ หรือมงกุฎดอกไม้ (สีปีกและเครื่องประดับเป็นของห้องแต่งตัวเอง ไม่มีขายในเกม)
+5. ใส่เครื่องประดับได้ 1 ชิ้น: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ หรือมงกุฎดอกไม้
 6. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
 7. เลือกกรอบชื่อจาก Item Mall ชื่อของคุณจะอยู่ในกรอบแบบเดียวกับในเกม
 8. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้: ออโรร่า ห้วงดาว วงเวท ประกายไฟ ซากุระ) และกรอบการ์ด
@@ -26,7 +26,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 2. Drag the character or use the arrows to turn it around.
 3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it), then wings and their colour: one of 7 or any colour you pick.
 4. Pick a pose: idle, walk, attack, attack 2 or sit (mages can also cast).
-5. Add one accessory: a halo, crown, cat ears, devil horns or a flower crown. Wing colours and accessories are the fitting room's own, not items sold in the game.
+5. Add one accessory: a halo, crown, cat ears, devil horns or a flower crown.
 6. Type your in-game name: it shows under the character with your class, like the game's name tag.
 7. Pick a name frame from the Item Mall: your name sits in it the way the game draws it.
 8. Pick a background (a colour or an animated pixel-art scene) and a card frame, then tap ✦ วางลงบอร์ด.
