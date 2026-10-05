@@ -70,8 +70,9 @@ npm run check-wings  # is the bundled wing code still the game's?
 npm run wing-code    # lift the wing code again after a game update
 npm run check-name-frames  # are the bundled name frame slices still the game's?
 npm run name-frames        # lift them again after a game update
+npm run preflight          # before submitting: committed, built, pushed, under Drawdy's limits, above the live version
 ```
 
-Drawdy builds published versions from this repository's `src/index.ts`, so commit `src/webview-html.ts` after `npm run build`. Bump `driverVersion` in `manifest.json` for every release and add it to `CHANGELOG.md`.
+Drawdy builds published versions from this repository's `src/index.ts`, so commit `src/webview-html.ts` after `npm run build`. Bump `driverVersion` in `manifest.json` for every release and add it to `CHANGELOG.md`. `npm test` holds the manifest and listing files to Drawdy's submission rules (a description of at most 500 characters, an icon of at most 256 KB, only `@drawdy/driver-protocol` imported from outside the repository).
 
 `dev/contact.ts` renders every wing and outfit in all eight directions as one sheet for visual checks: with `npm run dev` running, open `http://localhost:5182/version` and run `import("/dev/contact.ts")` in the console.

@@ -10,6 +10,7 @@
         "check-wings": "node scripts/wing-code.mjs --check",
         "name-frames": "node scripts/name-frames.mjs",
         "check-name-frames": "node scripts/name-frames.mjs --check",
+        "preflight": "node scripts/preflight.mjs",
         "dev": "vite",
         "build": "node build.ts",
         "test": "tsx --test test/*.test.ts",
