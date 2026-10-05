@@ -19,7 +19,9 @@ export type OwnWing = {
   textures: Record<string, string>;
 };
 
-export const UPLOAD_ID = "own-upload";
+const UPLOAD_PREFIX = "own-upload-";
+export const isUploadId = (id: string | null): id is string => !!id && id.startsWith(UPLOAD_PREFIX);
+export const newUploadId = () => `${UPLOAD_PREFIX}${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 // The longest side an upload is read at, which bounds the work of cutting it out.
 const READ_MAX = 512;
 // An upload is kept at the largest size offered, about as big as the game's biggest wings.
@@ -162,7 +164,7 @@ export async function uploadedWing(
   );
   hardenAlpha(px);
   if (saved.flip) mirror(px);
-  const id = `${UPLOAD_ID}:${version}`;
+  const id = `${saved.id}:${version}`;
   const style: WingStyle = {
     texture: `wing:${id}`,
     url: pngOf(px),
@@ -176,7 +178,7 @@ export async function uploadedWing(
   return {
     id,
     info: {
-      id: UPLOAD_ID,
+      id: saved.id,
       name: "ปีกของคุณ",
       description: "ปีกจากรูปของคุณเอง",
       icon: pairIcon(px),

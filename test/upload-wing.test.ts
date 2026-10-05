@@ -8,6 +8,7 @@ import {
   mirror,
   opaqueBox,
 } from "../src/art/upload-wing";
+import { isSavedWing } from "../src/messages";
 
 // A gold wing shape on a flat white page, with a white highlight inside it.
 const wingOnWhite = () => {
@@ -61,4 +62,13 @@ test("an empty image has no box, hardened alpha is all or nothing, and mirroring
   assert.deepEqual([...px.data.slice(0, 4)], [0, 0, 255, 255]);
   assert.deepEqual(fitInside(200, 100, { w: 56, h: 46 }), { w: 56, h: 28 });
   assert.deepEqual(fitInside(50, 400, { w: 56, h: 46 }), { w: 6, h: 46 });
+});
+
+test("a saved wing is kept only with its own id, a small PNG and a size and glow the panel offers", () => {
+  const wing = { id: "own-upload-lx3k9a", png: "data:image/png;base64,iVBORw0KGgo=", aura: "gold", size: "m", flip: false };
+  assert.ok(isSavedWing(wing));
+  assert.ok(!isSavedWing({ ...wing, id: "divine_wings" }), "a wing took a game wing's id");
+  assert.ok(!isSavedWing({ ...wing, png: "data:image/jpeg;base64,AAAA" }), "a wing kept a picture that is not the panel's PNG");
+  assert.ok(!isSavedWing({ ...wing, png: `data:image/png;base64,${"A".repeat(200_000)}` }), "a wing kept a huge picture");
+  assert.ok(!isSavedWing({ ...wing, aura: "rainbow" }) && !isSavedWing({ ...wing, size: "xl" }), "a wing kept a setting the panel does not offer");
 });

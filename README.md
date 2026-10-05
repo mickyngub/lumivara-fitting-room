@@ -9,14 +9,14 @@
 1. ติดตั้งแล้วห้องแต่งตัวจะเปิดขึ้นเอง ครั้งต่อไปกดไอคอน Lumivara ที่แถบด้านขวาของบอร์ด
 2. รอโหลดชุดจากเกมสักครู่ แล้วลากที่ตัวละครหรือกดลูกศรเพื่อหมุนดูรอบตัว
 3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพที่ชุดนั้นรองรับ เหมือนในเกม) และเปลี่ยนสีชุดได้ทีละส่วน (สีหลัก สีรอง สีที่ 3) 7 สี หรือเลือกสีเอง
-4. เลือกปีกจากเกม ปีก 5 แบบของห้องแต่งตัว หรือใช้รูปปีกของคุณเอง (เลือกไฟล์หรือลากรูปมาวาง แล้วปรับขนาด แสง และกลับด้านได้) เลือกสีปีก (7 สี หรือเลือกสีเอง) และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
+4. เลือกปีกจากเกม ปีก 5 แบบของห้องแต่งตัว หรือเพิ่มปีกจากรูปของคุณเองได้สูงสุด 8 แบบ (เลือกไฟล์หรือลากรูปมาวาง แล้วปรับขนาด แสง และกลับด้านของแต่ละปีกได้) เลือกสีปีก (7 สี หรือเลือกสีเอง) และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
 5. ใส่เครื่องประดับได้ 1 ชิ้นจาก 14 แบบ เช่น วงแหวนนางฟ้า มงกุฎ หูแมว หมวกแม่มด หูกระต่าย โบว์ หรือหูฟัง แล้วเปลี่ยนสีได้เหมือนปีก
 6. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
 7. เลือกกรอบชื่อจาก Item Mall ชื่อของคุณจะอยู่ในกรอบแบบเดียวกับในเกม
 8. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้ 15 แบบ เช่น ออโรร่า ซากุระ หิมะ ลาวา ใต้น้ำ และทุ่งหญ้า) และกรอบการ์ด
 9. กด ✦ วางลงบอร์ด การ์ดจะขยับวนได้เหมือนในเกม วางได้หลายใบ แล้วกด “แชร์” เพื่อส่งลิงก์ให้เพื่อน
 
-ชื่อ พื้นหลัง กรอบการ์ด และปีกจากรูปของคุณจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร ปีก และกรอบชื่อโหลดสดจาก lumivaraonline.com ทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
+ชื่อ พื้นหลัง กรอบการ์ด และปีกจากรูปของคุณทุกแบบจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร ปีก และกรอบชื่อโหลดสดจาก lumivaraonline.com ทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
 
 ## In English
 
@@ -24,7 +24,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 
 1. After installing, the Fitting Room opens on its own; next time, open it from the Lumivara button on the right of the board.
 2. Drag the character or use the arrows to turn it around.
-3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it) and, if you like, a colour for each of its parts (main, second and third); then wings, from the game, five of the fitting room's own, or one from your own image (pick a file or drop it on the tile, then set its size, glow and facing), and their colour. Each takes one of 7 colours or any colour you pick.
+3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it) and, if you like, a colour for each of its parts (main, second and third); then wings, from the game, five of the fitting room's own, or up to eight from your own images (pick a file or drop it on the + tile, then set each one's size, glow and facing), and their colour. Each takes one of 7 colours or any colour you pick.
 4. Pick a pose: idle, walk, attack, attack 2 or sit (mages can also cast).
 5. Add one of 14 accessories, from a halo and cat ears to a witch hat, bunny ears, a bow or headphones, in its own colour or one you pick.
 6. Type your in-game name: it shows under the character with your class, like the game's name tag.
@@ -37,7 +37,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 | --- | --- |
 | Interface | the Lumivara button and the Fitting Room panel |
 | Canvas | placing character cards on your board |
-| Local storage | remembering your name, background, frame and your own wing in this browser |
+| Local storage | remembering your name, background, frame and your own wings in this browser |
 
 The extension sends nothing anywhere. It only downloads the game's public fashion data and art from `lumivaraonline.com`.
 
@@ -46,7 +46,7 @@ The extension sends nothing anywhere. It only downloads the game's public fashio
 - Nothing about the fashion is bundled. Each time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits, wings and name frames with names, icons, art paths and wing placement) and builds each look's sprite sheet in the browser from the game's own atlases: idle, walk and every action pose the atlas has, in all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs. If the game cannot be reached the panel says so and offers a retry.
 - Characters are drawn with the game's own engine, Phaser 3.90, at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scaled up, so they match the game pixel for pixel.
 - Wings move with the game's own wing code (`src/game/wings.js`, lifted from the game client by `scripts/wing-code.mjs`); placement comes from `cosmetics.json`.
-- The fitting room's own five wings are pixel art drawn in code (`src/art/wings.ts`), each a right wing with its root at its inner edge like the game's, worn through the same wing code with one of its three effects. A wing from your own image is cut out of a flat background, cropped and brought to game size in the browser (`src/art/upload-wing.ts`, `webview/own-wings.ts`), then worn the same way; it is kept in this browser as a small PNG and never leaves it except inside the cards you place.
+- The fitting room's own five wings are pixel art drawn in code (`src/art/wings.ts`), each a right wing with its root at its inner edge like the game's, worn through the same wing code with one of its three effects. Each wing from your own images is cut out of a flat background, cropped and brought to game size in the browser (`src/art/upload-wing.ts`, `webview/own-wings.ts`), then worn the same way; up to eight are kept in this browser as small PNGs, each with its own size, glow, facing and colour, and they never leave it except inside the cards you place.
 - Accessories are pixel art drawn in code (`src/art/accessories.ts`) and set on the head of every frame: `src/game/head.ts` finds the top, centre and width of the head in each frame of the sprite sheet, so an accessory follows walking, sitting and attacks in all 8 directions, and pairs such as ears sit closer together seen from the side. Each accessory names the shades of its main material, and a colour moves those onto the one picked, keeping their steps of shading, while gems, trims and outlines stay as drawn (`dyeShades` in `src/art/dye.ts`).
 - A wing colour recolours the wing art in the browser (`src/art/dye.ts`): every colour turns the way the wing's main colour turns onto the chosen one, in hue, saturation and lightness, and dark outlines keep their lightness. The game's wing code still animates the dyed wing, and its glow, sparkles and swirls are turned the same way.
 - An outfit colour recolours the look's sprite sheet the same way, part by part (`clothParts` and `dyeCloth` in `src/art/dye.ts`): the clothes' colours are grouped into up to three hue families, largest first, and each takes its own colour, while skin, greys, outlines and hues far from every part stay as drawn. Inside each frame's head, found the way accessories find it, a warm colour (skin, hair, a beard) never changes, so a brown tunic can be dyed without the brown hair above it; a cool hat or hood still takes the colour. Skin elsewhere, such as hands, is a skin tone the standing frames' faces show at least as much of as the body does. Outfits that are mostly black or grey change little.

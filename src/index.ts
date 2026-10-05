@@ -6,15 +6,17 @@ import type {
 } from "@drawdy/driver-protocol";
 import { ACTION_BUTTON_SVG } from "./action-icon";
 import { buildCards, CARD } from "./card";
-import { isSavedWing, type CardPayload, type DriverToWebview, type SavedWing, type WebviewToDriver } from "./messages";
+import { isSavedWing, MAX_OWN_WINGS, type CardPayload, type DriverToWebview, type SavedWing, type WebviewToDriver } from "./messages";
 import { cleanName } from "./name";
 import { WEBVIEW_HTML } from "./webview-html";
 
 const SPOT_SEARCH_RINGS = 3;
 const FLY_MS = 500;
 const PROFILE_KEY = "profile";
-// Kept apart from the profile so typing a name never rewrites the wing's image.
-const WING_KEY = "wing";
+// Kept apart from the profile so typing a name never rewrites the wings' images.
+const WINGS_KEY = "wings";
+// Before several wings could be kept, the one wing was stored on its own here.
+const LEGACY_WING_KEY = "wing";
 
 let issue: DriverCommandIssuer;
 let driverId = "";
@@ -117,21 +119,26 @@ async function loadProfile(): Promise<Profile> {
   return profile;
 }
 
-async function loadWing(): Promise<SavedWing | undefined> {
+async function loadWings(): Promise<SavedWing[]> {
   const stored = await send({
     type: "command:kv-storage:get",
-    req: { key: WING_KEY },
+    req: { key: WINGS_KEY },
   });
-  const got = stored.res.value?.got;
-  return isSavedWing(got) ? got : undefined;
+  const list = stored.res.value?.got?.list;
+  if (Array.isArray(list)) return list.filter(isSavedWing).slice(0, MAX_OWN_WINGS);
+  const legacy = await send({
+    type: "command:kv-storage:get",
+    req: { key: LEGACY_WING_KEY },
+  });
+  const wing = { ...legacy.res.value?.got, id: "own-upload-1" };
+  return isSavedWing(wing) ? [wing] : [];
 }
 
-async function saveWing(wing: SavedWing | null): Promise<void> {
-  await send(
-    wing
-      ? { type: "command:kv-storage:set", req: { key: WING_KEY, payload: wing } }
-      : { type: "command:kv-storage:delete", req: { key: WING_KEY } },
-  );
+async function saveWings(wings: SavedWing[]): Promise<void> {
+  await send({
+    type: "command:kv-storage:set",
+    req: { key: WINGS_KEY, payload: { list: wings.filter(isSavedWing).slice(0, MAX_OWN_WINGS) } },
+  });
 }
 
 async function saveProfile(change: Partial<Profile>): Promise<void> {
@@ -207,8 +214,8 @@ export const onEvent: DriverModule["onEvent"] = async (event) => {
       if (event.body.webviewDomId !== webviewId) return;
       const message = event.body.message as WebviewToDriver | null;
       if (message?.type === "ready") {
-        const [stored, wing] = await Promise.all([loadProfile(), loadWing()]);
-        post({ type: "profile", ...stored, ...(wing ? { wing } : {}) });
+        const [stored, wings] = await Promise.all([loadProfile(), loadWings()]);
+        post({ type: "profile", ...stored, ...(wings.length ? { wings } : {}) });
       } else if (message?.type === "save-name") {
         await saveProfile({ name: cleanName(message.name) });
       } else if (message?.type === "save-style") {
@@ -216,8 +223,8 @@ export const onEvent: DriverModule["onEvent"] = async (event) => {
           ...(message.background ? { background: message.background } : {}),
           ...(message.frame ? { frame: message.frame } : {}),
         });
-      } else if (message?.type === "save-wing") {
-        await saveWing(isSavedWing(message.wing) ? message.wing : null);
+      } else if (message?.type === "save-wings") {
+        await saveWings(Array.isArray(message.wings) ? message.wings : []);
       } else if (message?.type === "place") {
         try {
           await place(message.cards);
