@@ -470,11 +470,53 @@ h2 {
     line-height: 1.5;
 }
 
-.wings {
+.wings .wing {
+    flex: none;
+    width: calc((100% - 18px) / 4);
+    scroll-snap-align: start;
+}
+
+.wing-plus {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 6px;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px dashed var(--gold-dark);
+    border-radius: 50%;
+    color: var(--gold-light);
+    font: 600 20px/1 var(--sans);
+}
+
+.wing-tools {
+    display: grid;
+    gap: 5px;
+    margin: 2px 0 6px;
+}
+
+.wing-tools[hidden] {
+    display: none;
+}
+
+.wing-tool-row {
+    display: flex;
+    gap: 4px;
+}
+
+.wing-tool-row .pose {
+    flex: 1 1 0;
+}
+
+.wing-tool-hint {
+    margin: 0 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+    line-height: 1.4;
+}
+
+.wing-error {
+    margin: 6px 2px 0;
+    color: var(--coral);
+    font-size: 11.5px;
 }
 
 .wing {
@@ -492,6 +534,7 @@ h2 {
 }
 
 .wing img {
+    object-fit: contain;
     image-rendering: pixelated;
 }
 

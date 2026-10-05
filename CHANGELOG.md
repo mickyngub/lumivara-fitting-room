@@ -4,6 +4,9 @@
 
 - พื้นหลังเคลื่อนไหวเพิ่ม 10 แบบตามแผนที่ในเกม: หิมะ ลาวา คริสตัล พายุ หิ่งห้อย ใต้น้ำ ทะเลทราย คืนจันทร์ ทุ่งหญ้า และสวรรค์ · 10 more animated backgrounds themed on the game's areas: snowfall, lava, crystal, storm, fireflies, underwater, desert, moonlit night, meadow and heaven
 - พื้นหลังทั้งสีพื้นและฉากอยู่ในแถวเดียว เลื่อนซ้ายขวาได้เหมือนกรอบการ์ด · backgrounds, colours and scenes alike, sit in one row that scrolls sideways like the card frames
+- ปีกเพิ่ม 5 แบบ: Butterfly Wings, Fairy Wings, Dragon Wings, Frost Wings และ Phoenix Wings ขยับ เปลี่ยนสี และมีแสงแบบปีกในเกม · 5 more wings: Butterfly, Fairy, Dragon, Frost and Phoenix Wings, flapping, dyeable and glowing like the game's
+- ปีกของคุณ: ใช้รูปปีกของคุณเอง เลือกไฟล์หรือลากรูปมาวาง ตัดพื้นหลังสีเรียบออกให้ ปรับขนาด แสง และกลับด้านได้ เปลี่ยนสีได้ และจำไว้ในเบราว์เซอร์นี้ · your own wing: pick or drop an image, its flat background is cut away, set its size, glow and facing, dye it, and it is remembered in this browser
+- ปีกทั้งหมดอยู่ในแถวเดียว เลื่อนซ้ายขวาได้ · all wings sit in one row that scrolls sideways
 - เครื่องประดับเพิ่ม 9 แบบ: หมวกแม่มด หมวกทรงสูง หูกระต่าย หูจิ้งจอก โบว์ หูฟัง ต้นอ่อน มงกุฎเจ้าหญิง และเขากวาง · 9 more accessories: a witch hat, top hat, bunny ears, fox ears, bow, headphones, sprout, tiara and antlers
 - สีเครื่องประดับ: เปลี่ยนสีเครื่องประดับได้ทุกชิ้น 7 สี หรือเลือกสีเอง อัญมณีและขอบยังเป็นสีเดิม แต่ละชิ้นจำสีของตัวเอง · accessory colours: every accessory takes one of 7 colours or any you pick, with gems and trims kept as drawn and each remembering its own
 - สีชุด: เปลี่ยนสีชุดปกติหรือชุดแฟชั่นได้ทีละส่วน สูงสุด 3 ส่วน 7 สี หรือเลือกสีเอง ผิว หน้า และผมยังเป็นสีเดิม ชุดแต่ละแบบจำสีของตัวเอง · outfit colours: dye a plain look or a fashion outfit part by part, up to three parts, in 7 colours or any you pick, with skin, faces and hair kept as drawn and each look remembering its colours

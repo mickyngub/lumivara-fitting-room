@@ -2,7 +2,8 @@ import { CARD, FRAME, LOGO, PLATE } from "../src/card";
 import { apng, type ApngFrame } from "../src/art/apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, NameFrame, WingInfo } from "../src/game/types";
-import type { DriverToWebview, WebviewToDriver } from "../src/messages";
+import type { DriverToWebview, SavedWing, WebviewToDriver } from "../src/messages";
+import { drawnWings, readWing, uploadedWing, UPLOAD_ID, WING_AURAS, WING_SIZES, type OwnWing } from "./own-wings";
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameplate, loadNameFont, nameplate, type NameFrameArt, type Rect } from "./nametag";
 import { loadCatalog, loadImage, type Catalog } from "./live";
@@ -62,6 +63,12 @@ let wingsId: string | null = null;
 // Each wing keeps the colour it was given.
 const wingDyes = new Map<string, string>();
 const wingDye = () => (wingsId ? (wingDyes.get(wingsId) ?? null) : null);
+// The player's own wing: what is saved, and the wing the game's wing code wears for it.
+let savedWing: SavedWing | null = null;
+let ownWing: OwnWing | null = null;
+let wingVersion = 0;
+let pendingWing: SavedWing | null = null;
+const wingName = (id: string) => (id === UPLOAD_ID ? "ปีกของคุณ" : (WINGS.find((w) => w.id === id)?.name ?? "ปีก"));
 const DYES = [
   { hex: "#e5484d", name: "แดง" },
   { hex: "#3fbf6a", name: "เขียว" },
@@ -130,7 +137,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
   const f = poseAt(pose, l, direction, t);
   return {
     look: l,
-    wings: wingsId,
+    wings: wingsId === UPLOAD_ID ? (ownWing?.id ?? null) : wingsId,
     dye: wingDye(),
     lookDyes: lookDyesOf(l.id),
     accessory: accessoryId,
@@ -535,6 +542,7 @@ async function exportCard(l: Look): Promise<string> {
     backdrop: cardBackdrop(background()),
   });
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
+  if (wingsId === UPLOAD_ID && ownWing) await exporter.useWing(ownWing.id, ownWing.style);
   const direction = DIRECTIONS[dirIndex];
   const { cardFrames, loopMs } = poseOf(l);
   const lines = nameplate(playerName, plainLook().className);
@@ -654,8 +662,10 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     dyeTray(LOOK_TRAY),
     h("h2", {}, "ปีก"),
-    h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
+    h("div", { id: "wings", class: "frames wings", role: "radiogroup", "aria-label": "ปีก", onscroll: () => syncDyes(WING_TRAY) }, ...skeletons(4, "wing")),
     dyeTray(WING_TRAY),
+    h("p", { id: "wing-error", class: "wing-error", role: "alert", hidden: true }),
+    h("input", { id: "wing-file", type: "file", accept: "image/png,image/webp,image/gif,image/jpeg", hidden: true, onchange: onWingFile }),
     h("h2", {}, "เครื่องประดับ"),
     h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ", onscroll: () => syncDyes(ACCESSORY_TRAY) }),
     dyeTray(ACCESSORY_TRAY),
@@ -690,6 +700,7 @@ function buildLayout(): void {
   renderBackgrounds();
   renderFrames();
   renderDyes(WING_TRAY);
+  document.querySelector("#wing-tray .dye-rows")!.before(wingTools());
   renderDyes(LOOK_TRAY);
   renderAccessories();
   renderDyes(ACCESSORY_TRAY);
@@ -767,10 +778,7 @@ function renderWings(): void {
         type: "button",
         class: "wing",
         "data-wings": "",
-        onclick: () => {
-          wingsId = null;
-          renderChoices();
-        },
+        onclick: () => setWings(null),
       },
       h("span", { class: "none" }, "ไม่ใส่"),
     ),
@@ -782,17 +790,124 @@ function renderWings(): void {
           class: "wing",
           "data-wings": w.id,
           title: w.description,
-          onclick: () => {
-            wingsId = w.id;
-            renderChoices();
-          },
+          onclick: () => setWings(w.id),
         },
         w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
         h("span", {}, w.name),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
       ),
     ),
+    h(
+      "button",
+      {
+        type: "button",
+        class: "wing",
+        "data-wings": UPLOAD_ID,
+        title: "ใช้รูปปีกของคุณเอง: กดเพื่อเลือกรูป หรือลากรูปมาวางตรงนี้",
+        onclick: () => (ownWing ? setWings(UPLOAD_ID) : pickWingFile()),
+        ondragover: (e: DragEvent) => e.preventDefault(),
+        ondrop: dropWing,
+      },
+      ownWing ? h("img", { src: ownWing.info.icon, alt: "", width: 36, height: 36, "data-icon": ownWing.info.icon }) : h("span", { class: "wing-plus", "aria-hidden": "true" }, "+"),
+      h("span", {}, "ปีกของคุณ"),
+      h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
+    ),
   );
+}
+
+function setWings(id: string | null): void {
+  wingsId = id;
+  renderChoices();
+}
+
+function showWingError(message: string | null): void {
+  const node = document.getElementById("wing-error")!;
+  node.textContent = message ?? "";
+  node.hidden = !message;
+}
+
+const pickWingFile = () => (document.getElementById("wing-file") as HTMLInputElement).click();
+
+function onWingFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  void takeWingFile(file);
+}
+
+function dropWing(event: DragEvent): void {
+  event.preventDefault();
+  void takeWingFile(event.dataTransfer?.files[0]);
+}
+
+async function takeWingFile(file: File | undefined): Promise<void> {
+  if (!file || !live) return;
+  if (!file.type.startsWith("image/")) return showWingError("ใช้ไฟล์รูปภาพ เช่น PNG หรือ JPG");
+  try {
+    const png = await readWing(file);
+    await wearWing({ png, aura: savedWing?.aura ?? "gold", size: savedWing?.size ?? "m", flip: false }, { wear: true, save: true });
+  } catch (err) {
+    showWingError(err instanceof Error ? err.message : String(err));
+  }
+}
+
+/** Builds the player's wing and gives it to the game's wing code; only the latest change is kept. */
+async function wearWing(saved: SavedWing, then: { wear: boolean; save: boolean }): Promise<void> {
+  const version = ++wingVersion;
+  showWingError(null);
+  const wing = await uploadedWing(saved, version);
+  await live!.useWing(wing.id, wing.style);
+  if (version !== wingVersion) return;
+  savedWing = saved;
+  ownWing = wing;
+  if (then.wear) wingsId = UPLOAD_ID;
+  renderWings();
+  renderChoices();
+  if (then.save) send({ type: "save-wing", wing: saved });
+}
+
+function changeWing(change: Partial<SavedWing>): void {
+  if (!savedWing) return;
+  wearWing({ ...savedWing, ...change }, { wear: true, save: true }).catch((err) => showWingError(err instanceof Error ? err.message : String(err)));
+}
+
+function removeWing(): void {
+  wingVersion++;
+  savedWing = null;
+  ownWing = null;
+  wingDyes.delete(UPLOAD_ID);
+  if (wingsId === UPLOAD_ID) wingsId = null;
+  send({ type: "save-wing", wing: null });
+  renderWings();
+  renderChoices();
+}
+
+// Built once, inside the wing tray, for the player's own wing.
+function wingTools(): HTMLElement {
+  const tool = (label: string, attrs: Record<string, unknown>, onclick: () => void) => h("button", { type: "button", class: "pose", ...attrs, onclick }, label);
+  return h(
+    "div",
+    { id: "wing-tools", class: "wing-tools", hidden: true },
+    h(
+      "div",
+      { class: "wing-tool-row" },
+      tool("เปลี่ยนรูป", {}, pickWingFile),
+      tool("กลับด้าน", { role: "switch", "data-wing-flip": "" }, () => changeWing({ flip: !savedWing?.flip })),
+      tool("เอาออก", {}, removeWing),
+    ),
+    h("div", { class: "wing-tool-row", role: "radiogroup", "aria-label": "ขนาดปีก" }, ...WING_SIZES.map((s) => tool(s.name, { role: "radio", "data-wing-size": s.id }, () => changeWing({ size: s.id })))),
+    h("div", { class: "wing-tool-row", role: "radiogroup", "aria-label": "แสงของปีก" }, ...WING_AURAS.map((a) => tool(a.name, { role: "radio", "data-wing-aura": a.id }, () => changeWing({ aura: a.id })))),
+    h("p", { class: "wing-tool-hint" }, "ใช้รูปปีกข้างเดียวที่กางไปทางขวา โคนปีกอยู่ซ้าย พื้นหลังโปร่งใสหรือสีเรียบ"),
+  );
+}
+
+function syncWingTools(): void {
+  const tools = document.getElementById("wing-tools");
+  if (!tools) return;
+  tools.hidden = wingsId !== UPLOAD_ID || !savedWing;
+  tools.querySelectorAll<HTMLElement>("[data-wing-size]").forEach((n) => n.setAttribute("aria-checked", String(n.dataset.wingSize === savedWing?.size)));
+  tools.querySelectorAll<HTMLElement>("[data-wing-aura]").forEach((n) => n.setAttribute("aria-checked", String(n.dataset.wingAura === savedWing?.aura)));
+  tools.querySelector("[data-wing-flip]")?.setAttribute("aria-checked", String(!!savedWing?.flip));
 }
 
 const iconDyes = new Map<string, Promise<string>>();
@@ -861,7 +976,7 @@ const WING_TRAY: DyeTray = {
   tray: "wing-tray",
   rows: () => [{ id: "wing-dyes", label: "สีปีก", current: wingDye, set: setWingDye }],
   tile: () => (wingsId ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`) : null),
-  title: () => (wingsId ? `สีของ ${WINGS.find((w) => w.id === wingsId)?.name ?? "ปีก"}` : null),
+  title: () => (wingsId ? `สีของ ${wingName(wingsId)}` : null),
 };
 
 const hexOf = (c: Hsl) => `#${hslToRgb(c).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
@@ -948,6 +1063,7 @@ function syncDyes(t: DyeTray): void {
 }
 
 function syncWingDyes(): void {
+  syncWingTools();
   syncDyes(WING_TRAY);
   document.querySelectorAll<HTMLElement>("[data-wings]").forEach(paintWingTile);
 }
@@ -1093,15 +1209,22 @@ async function load(): Promise<void> {
     showLoading({ error: err instanceof Error ? err.message : String(err) });
     return;
   }
-  useWingStyles(catalog.styles);
+  const own = drawnWings();
+  useWingStyles({ ...catalog.styles, ...Object.fromEntries(own.map((w) => [w.id, w.style])) });
+  Object.assign(catalog.wingTextures, ...own.map((w) => w.textures));
   CLASS_LOOKS = catalog.looks.filter((l) => l.kind === "class");
   OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
-  WINGS = catalog.wings;
+  WINGS = [...catalog.wings, ...own.map((w) => w.info)];
   NAME_FRAMES = catalog.nameFrames;
   classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
   outfitId = OUTFITS[0]?.id ?? null;
   wingsId = WINGS[0]?.id ?? null;
   startStage();
+  if (pendingWing) {
+    const saved = pendingWing;
+    pendingWing = null;
+    wearWing(saved, { wear: false, save: false }).catch(() => {});
+  }
   renderWings();
   renderNameFrames();
   renderPickers();
@@ -1113,6 +1236,10 @@ api.onMessage((raw) => {
   if (message.type === "profile") {
     if (message.background) setBackground(message.background, false);
     if (message.frame) setFrame(message.frame, false);
+    if (message.wing && !savedWing) {
+      if (live) wearWing(message.wing, { wear: false, save: false }).catch(() => {});
+      else pendingWing = message.wing;
+    }
     const input = document.getElementById("name-input") as HTMLInputElement | null;
     if (!message.name || (input ? input.value : playerName)) return;
     playerName = cleanName(message.name);

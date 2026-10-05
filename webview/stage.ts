@@ -208,6 +208,18 @@ export class Stage {
     texture.refresh();
   }
 
+  /** Adds a wing made after the stage booted, such as the player's own, to the game's wing code. */
+  async useWing(id: string, style: WingStyle): Promise<void> {
+    await this.ready;
+    if (!this.textures.exists(style.texture)) {
+      const image = new Image();
+      image.src = style.url;
+      await image.decode();
+      if (!this.textures.exists(style.texture)) this.textures.addImage(style.texture, image);
+    }
+    kit.config[id] = style;
+  }
+
   /** Phaser creates its canvas while booting, so this is set once ready resolves. */
   get canvas(): HTMLCanvasElement {
     return this.game.canvas;
