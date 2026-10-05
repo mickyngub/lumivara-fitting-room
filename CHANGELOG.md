@@ -3,6 +3,7 @@
 ## 1.2.0
 
 - สีปีก: ย้อมปีกได้ 7 สี หรือเลือกสีเอง ทั้งแสง ประกาย และควันของปีกเปลี่ยนสีตาม · wing colours: 7 dyes or any colour you pick, with the wings' glow, sparkles and swirls dyed to match
+- เครื่องประดับ: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ และมงกุฎดอกไม้ อยู่บนหัวทุกท่าและทุกทิศ · accessories: a halo, crown, cat ears, devil horns and a flower crown that stay on the head in every pose and direction
 
 ## 1.1.0
 

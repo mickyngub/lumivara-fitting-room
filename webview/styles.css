@@ -386,6 +386,11 @@ h2 {
     font: 600 13px/1.4 var(--serif);
 }
 
+.custom-note {
+    color: var(--faint);
+    font: 400 10px/1.4 var(--sans);
+}
+
 .looks {
     display: flex;
     gap: 6px;
@@ -627,7 +632,8 @@ h2 {
 }
 
 .fx img,
-.fx .fx-none {
+.fx .fx-none,
+.fx .acc-thumb {
     width: 36px;
     height: 36px;
     image-rendering: pixelated;
@@ -638,12 +644,12 @@ h2 {
     border-radius: 50%;
 }
 
-.name-frames .fx span {
+.item-row .fx span {
     white-space: normal;
     text-align: center;
 }
 
-.name-frames .skeleton {
+.item-row .skeleton {
     height: 74px;
 }
 

@@ -12,6 +12,7 @@ import { loadCatalog, loadImage, type Catalog } from "./live";
 import { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles, type Backdrop, type BackdropTime, type Scene } from "./stage";
 import { FLAP_PERIOD_MS, poseAt, poseById, posesFor, type PoseDef } from "../src/game/poses";
 import { EFFECTS, type Effect } from "../src/art/effects";
+import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
 import { THEMES, type Theme } from "./themes";
@@ -61,6 +62,7 @@ const WING_DYES = [
   { hex: "#2b2b36", name: "ดำ" },
 ];
 const CUSTOM_DYE = "#7ec8ff";
+let accessoryId: string | null = null;
 let nameFrameId: string | null = null;
 const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
 type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
@@ -114,6 +116,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
     look: l,
     wings: wingsId,
     dye: wingDye,
+    accessory: accessoryId,
     pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
     wingMs: f.wingMs,
     loop: f.loop,
@@ -572,7 +575,7 @@ function buildLayout(): void {
       }),
     ),
     h("h2", {}, "กรอบชื่อ"),
-    h("div", { id: "name-frames", class: "frames name-frames", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(6, "fx")),
+    h("div", { id: "name-frames", class: "frames item-row", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(6, "fx")),
     h("h2", {}, "พื้นหลัง"),
     h("div", { id: "backgrounds", class: "backgrounds" }),
     h("h2", {}, "กรอบการ์ด"),
@@ -583,8 +586,10 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
-    h("h2", {}, "สีปีก"),
+    h("h2", {}, "สีปีก ", customNote()),
     h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
+    h("h2", {}, "เครื่องประดับ ", customNote()),
+    h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ" }),
     h(
       "div",
       { class: "actions" },
@@ -616,6 +621,7 @@ function buildLayout(): void {
   renderBackgrounds();
   renderFrames();
   renderWingDyes();
+  renderAccessories();
   requestAnimationFrame(animateFxThumbs);
 }
 
@@ -751,6 +757,59 @@ function syncWingDyes(): void {
 function setWingDye(hex: string | null): void {
   wingDye = hex;
   syncWingDyes();
+}
+
+// Wing colours and accessories are the fitting room's own, so players don't look for them in the Item Mall.
+const customNote = () => h("small", { class: "custom-note" }, "ออกแบบเอง · ไม่มีในเกม");
+
+const ACCESSORY_THUMB = { size: 36, headW: 16 };
+
+// The accessory alone, cropped to its pixels and scaled up by whole pixels.
+function accessoryThumb(accessory: Accessory): HTMLCanvasElement {
+  const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
+  accessory.paint(px, ACCESSORY_THUMB.headW, 1);
+  let [left, top, right, bottom] = [px.w, px.h, -1, -1];
+  for (let y = 0; y < px.h; y++) {
+    for (let x = 0; x < px.w; x++) {
+      if (!px.data[(y * px.w + x) * 4 + 3]) continue;
+      [left, top, right, bottom] = [Math.min(left, x), Math.min(top, y), Math.max(right, x), Math.max(bottom, y)];
+    }
+  }
+  const art = h("canvas", { width: px.w, height: px.h });
+  art.getContext("2d")!.putImageData(new ImageData(px.data, px.w, px.h), 0, 0);
+  const [cw, ch] = [right - left + 1, bottom - top + 1];
+  const scale = Math.max(1, Math.floor(ACCESSORY_THUMB.size / Math.max(cw, ch)));
+  const thumb = h("canvas", { width: ACCESSORY_THUMB.size, height: ACCESSORY_THUMB.size, class: "acc-thumb" });
+  const ctx = thumb.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(art, left, top, cw, ch, Math.floor((ACCESSORY_THUMB.size - cw * scale) / 2), Math.floor((ACCESSORY_THUMB.size - ch * scale) / 2), cw * scale, ch * scale);
+  return thumb;
+}
+
+function renderAccessories(): void {
+  document.getElementById("accessories")!.replaceChildren(
+    h(
+      "button",
+      { type: "button", class: "fx", "data-accessory": "", onclick: () => setAccessory(null) },
+      h("span", { class: "fx-none", "aria-hidden": "true" }),
+      h("span", {}, "ไม่ใส่"),
+    ),
+    ...ACCESSORIES.map((a) =>
+      h("button", { type: "button", class: "fx", "data-accessory": a.id, onclick: () => setAccessory(a.id) }, accessoryThumb(a), h("span", {}, a.name)),
+    ),
+  );
+  syncAccessories();
+}
+
+function syncAccessories(): void {
+  document
+    .querySelectorAll<HTMLElement>("[data-accessory]")
+    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.accessory || null) === accessoryId)));
+}
+
+function setAccessory(id: string | null): void {
+  accessoryId = id;
+  syncAccessories();
 }
 
 function setNameFrame(id: string | null): void {

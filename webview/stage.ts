@@ -2,10 +2,15 @@
 import { createWingKit } from "../src/game/wings.js";
 import { FLAP_PERIOD_MS } from "../src/game/poses";
 import { dyePixels, dyeRgb, hexToHsl, mainColour, type Hsl } from "../src/art/dye";
+import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
+import { pixels } from "../src/art/pixels";
+import { findHeads, type Head } from "../src/game/head";
 import type { Look, WingStyle } from "../src/game/types";
 
 const FEET_OFFSET = 9;
 const BODY_DEPTH = 10;
+// Over the body and over the wings, which the wing code draws in front of the body seen from behind.
+const ACCESSORY_DEPTH = BODY_DEPTH + 2;
 // The game's player shadow: add.ellipse(x, feet, 25, 9, 0x122018, 0.4).
 const SHADOW = { w: 25, h: 9, color: 0x122018, alpha: 0.4 };
 const BACKDROP_DEPTH = -1e6;
@@ -32,6 +37,7 @@ export type Scene = {
   wings: string | null;
   /** A colour to dye the wings, or none for the game's own. */
   dye?: string | null;
+  accessory?: string | null;
   pose: Pose;
   wingMs: number;
   loop: BackdropTime;
@@ -66,6 +72,8 @@ const png = (b64: string) => `data:image/png;base64,${b64}`;
 export class Stage {
   readonly ready: Promise<void>;
   private body!: Phaser.GameObjects.Sprite;
+  private accessory!: Phaser.GameObjects.Image;
+  private readonly heads = new Map<string, Head[][]>();
   private textures!: Phaser.Textures.TextureManager;
   private readonly torsoOffsets = new Map<string, Map<string, number>>();
   private backdropTexture: Phaser.Textures.CanvasTexture | null = null;
@@ -118,6 +126,11 @@ export class Stage {
         stage.body = this.add
           .sprite(feet.x, feet.y, looks[0].id, 0)
           .setDepth(groundY + BODY_DEPTH);
+        stage.accessory = this.add
+          .image(0, 0, "__DEFAULT")
+          .setOrigin(0)
+          .setDepth(groundY + ACCESSORY_DEPTH)
+          .setVisible(false);
         stage.entity = Object.assign(
           {
             x: feet.x,
@@ -284,6 +297,51 @@ export class Stage {
     for (const swirl of parts.swirls) swirl.setTexture(this.dyedTexture(swirl.texture.key, dye, main));
   }
 
+  private headsOf(look: Look): Head[][] {
+    let heads = this.heads.get(look.id);
+    if (!heads) {
+      const { data, width } = this.sourcePixels(look.id).image;
+      heads = findHeads(data, width, look.sheet, (dir) => look.sheet.cell.w / 2 + this.torsoOffset(look, dir));
+      this.heads.set(look.id, heads);
+    }
+    return heads;
+  }
+
+  private accessoryTexture(accessory: Accessory, headW: number, facing: number): string {
+    const key = `accessory:${accessory.id}:${headW}:${facing}`;
+    if (!this.textures.exists(key)) {
+      const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
+      accessory.paint(px, headW, facing);
+      const canvas = document.createElement("canvas");
+      canvas.width = px.w;
+      canvas.height = px.h;
+      canvas.getContext("2d")!.putImageData(new ImageData(px.data, px.w, px.h), 0, 0);
+      this.textures.addCanvas(key, canvas);
+    }
+    return key;
+  }
+
+  /** Sets the accessory on the head of the frame the body shows; it floats in step with the card's loop. */
+  private placeAccessory(scene: Scene, rowIndex: number, frame: number, bodyX: number): void {
+    const accessory = ACCESSORIES.find((a) => a.id === scene.accessory);
+    if (!accessory) {
+      this.accessory.setVisible(false);
+      return;
+    }
+    const { look, pose, loop } = scene;
+    const { cell, baseline } = look.sheet;
+    const head = this.headsOf(look)[rowIndex][frame];
+    const facing = Math.round(Math.abs(Math.sin((DIRECTIONS.indexOf(pose.direction) * Math.PI) / 4)) * 100) / 100;
+    const bob = accessory.float ? Math.round(Math.sin((2 * Math.PI * loop.ms) / loop.loopMs) * accessory.float) : 0;
+    this.accessory
+      .setTexture(this.accessoryTexture(accessory, head.w, facing))
+      .setPosition(
+        Math.round(bodyX - cell.w / 2 + head.x - 0.5) - ACCESSORY_ART.x,
+        this.options.feet.y - baseline + head.top - ACCESSORY_ART.top + bob,
+      )
+      .setVisible(true);
+  }
+
   private apply(scene: Scene): void {
     const { look, pose } = scene;
     const { feet } = this.options;
@@ -304,10 +362,12 @@ export class Stage {
     const rowIndex = Math.max(0, rowOf(pose.anim) >= 0 ? rowOf(pose.anim) : rowOf("idle"));
     const cols = Math.max(...rows.map((r) => r.count));
     const frame = pose.frame % rows[rowIndex].count;
+    const bodyX = feet.x - this.torsoOffset(look, pose.direction);
     this.body
       .setTexture(look.id, rowIndex * cols + frame)
       .setOrigin(0.5, baseline / cell.h)
-      .setPosition(feet.x - this.torsoOffset(look, pose.direction), feet.y);
+      .setPosition(bodyX, feet.y);
+    this.placeAccessory(scene, rowIndex, frame, bodyX);
     this.entity.drawWings({ visible: true, y: feet.y - FEET_OFFSET });
     if (this.animatedBackdrop) {
       this.backdropTime = scene.loop;

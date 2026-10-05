@@ -13,6 +13,8 @@ import { EFFECTS } from "../src/art/effects";
 import { FRAME_GRID, FRAME_STYLES, paintFrame } from "../src/art/frames";
 import { pixels } from "../src/art/pixels";
 import { dyePixels, dyeRgb, hexToHsl, hslToRgb, mainColour, rgbToHsl } from "../src/art/dye";
+import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
+import { findHeads } from "../src/game/head";
 
 const maxKeyframes = 32;
 const idleFrames = 15;
@@ -392,6 +394,64 @@ test("a dyed tint can keep its lightness, so the far wing stays as shaded", () =
   const [before, after] = [far, dyed].map((c) => rgbToHsl((c >> 16) & 255, (c >> 8) & 255, c & 255));
   assert.ok(Math.abs(after.l - before.l) < 0.01, `far lightness went from ${before.l} to ${after.l}`);
   assert.ok(Math.abs(after.h - 199) < 5, `far hue is ${after.h}`);
+});
+
+test("the head is found at the top of each frame, and a frame holding something over its head keeps the idle head", () => {
+  const cell = { w: 20, h: 24 };
+  const sheet = { cell, baseline: 22, rows: [{ anim: "idle", dir: "south", count: 2 }, { anim: "attack", dir: "south", count: 1 }] };
+  const width = 2 * cell.w;
+  const data = new Uint8ClampedArray(width * 2 * cell.h * 4);
+  const fill = (x0: number, y0: number, w: number, h: number) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) data[(y * width + x) * 4 + 3] = 255;
+  };
+  fill(6, 10, 8, 8);
+  fill(7, 18, 6, 4);
+  fill(cell.w + 6, 11, 8, 8);
+  fill(cell.w + 7, 19, 6, 3);
+  fill(6, cell.h + 10, 8, 8);
+  fill(10, cell.h + 1, 2, 9);
+  const [[still, bobbed], [attack]] = findHeads(data, width, sheet, () => 10);
+  assert.deepEqual(still, { x: 10, top: 10, w: 8 });
+  assert.equal(bobbed.top, 11, "the head did not follow the bob");
+  assert.deepEqual(attack, still, "a sword over the head was taken for the head");
+});
+
+const paintAccessory = (a: Accessory, headW: number, facing: number) => {
+  const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
+  a.paint(px, headW, facing);
+  return px;
+};
+const opaqueBox = (px: { w: number; h: number; data: Uint8ClampedArray }) => {
+  let [left, top, right, bottom] = [px.w, px.h, -1, -1];
+  for (let y = 0; y < px.h; y++) {
+    for (let x = 0; x < px.w; x++) {
+      if (!px.data[(y * px.w + x) * 4 + 3]) continue;
+      [left, top, right, bottom] = [Math.min(left, x), Math.min(top, y), Math.max(right, x), Math.max(bottom, y)];
+    }
+  }
+  return { left, top, right, bottom };
+};
+
+test("every accessory sits on the head, stays inside its texture, mirrors about the head's centre and narrows from the side", () => {
+  const { w, h, x: centre, top: headTop } = ACCESSORY_ART;
+  for (const a of ACCESSORIES) {
+    for (const headW of [10, 16, 24]) {
+      const front = paintAccessory(a, headW, 1);
+      const box = opaqueBox(front);
+      assert.ok(box.right >= 0, `${a.id} paints nothing`);
+      assert.ok(box.left > 0 && box.top > 0 && box.right < w - 1 && box.bottom < h - 1, `${a.id} reaches the edge of its texture at head width ${headW}`);
+      assert.ok(box.top <= headTop + 4 && box.bottom >= headTop - 4, `${a.id} is not on the head`);
+      let unmatched = 0;
+      for (let y = 0; y < h; y++) {
+        for (let d = 1; centre + d < w && centre - d >= 0; d++) {
+          if (!front.data[(y * w + centre + d) * 4 + 3] !== !front.data[(y * w + centre - d) * 4 + 3]) unmatched++;
+        }
+      }
+      assert.ok(unmatched <= 4, `${a.id} is lopsided by ${unmatched} pixels at head width ${headW}`);
+      const side = opaqueBox(paintAccessory(a, headW, 0));
+      assert.ok(side.right - side.left <= box.right - box.left, `${a.id} is wider from the side`);
+    }
+  }
 });
 
 test("an action pose plays every frame of the move once per card loop, then stands until the loop closes", () => {
