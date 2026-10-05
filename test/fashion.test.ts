@@ -236,51 +236,88 @@ test("the game's own wing code runs outside the game and places every wing part 
 });
 
 // A width×height PNG filled with one RGBA colour, as a canvas would encode it.
-const solidPng = (width: number, height: number, rgba: number[]) => {
-  const chunk = (type: string, data: Uint8Array) => {
-    const body = new Uint8Array([...Buffer.from(type, "latin1"), ...data]);
-    const out = Buffer.alloc(12 + data.length);
-    out.writeUInt32BE(data.length, 0);
-    out.set(body, 4);
-    out.writeUInt32BE(crc32(body), 8 + data.length);
-    return out;
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8);
-  const rows = Buffer.concat(Array.from({ length: height }, () => Buffer.from([0, ...Array.from({ length: width }, () => rgba).flat()])));
-  return new Uint8Array(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(rows)), chunk("IEND", new Uint8Array(0))]));
-};
+const u32 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint32(at);
+const u16 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint16(at);
+const inflate = async (data: Uint8Array) =>
+  new Uint8Array(await new Response(new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate"))).arrayBuffer());
 
-test("frames become one animated PNG that loops for ever, each shown for the same time, numbered in order", () => {
-  const frames = [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]].map((c) => ({ png: solidPng(4, 3, c), x: 0, y: 0 }));
-  const out = apng(frames, { num: 900, den: 3000 });
+// Plays an APNG the way a browser does: each frame's region replaces what is under it.
+async function playApng(png: Uint8Array): Promise<{ frames: number[][]; delays: [number, number][] }> {
+  const chunks = pngChunks(png);
+  const ihdr = chunks.find((c) => c.type === "IHDR")!.data;
+  const [w, h] = [u32(ihdr, 0), u32(ihdr, 4)];
+  const plte = chunks.find((c) => c.type === "PLTE")!.data;
+  const trns = chunks.find((c) => c.type === "tRNS")?.data ?? new Uint8Array(0);
+  const canvas = new Array<number>(w * h * 4).fill(0);
+  const frames: number[][] = [];
+  const delays: [number, number][] = [];
+  let control: Uint8Array | null = null;
+  for (const c of chunks) {
+    if (c.type === "fcTL") control = c.data;
+    if (c.type !== "IDAT" && c.type !== "fdAT") continue;
+    const [fw, fh, fx, fy] = [u32(control!, 4), u32(control!, 8), u32(control!, 12), u32(control!, 16)];
+    const rows = await inflate(c.type === "IDAT" ? c.data : c.data.subarray(4));
+    for (let y = 0; y < fh; y++) {
+      assert.equal(rows[y * (fw + 1)], 0, "a row is filtered");
+      for (let x = 0; x < fw; x++) {
+        const i = rows[y * (fw + 1) + 1 + x];
+        canvas.splice(((fy + y) * w + fx + x) * 4, 4, plte[i * 3], plte[i * 3 + 1], plte[i * 3 + 2], i < trns.length ? trns[i] : 255);
+      }
+    }
+    frames.push([...canvas]);
+    delays.push([u16(control!, 20), u16(control!, 22)]);
+  }
+  return { frames, delays };
+}
+
+const fill = (w: number, h: number, rgba: number[]) => new Uint8ClampedArray(w * h * 4).map((_, i) => rgba[i % 4]);
+
+test("frames become one palette animated PNG that loops for ever, numbered in order, with every chunk's CRC right", async () => {
+  const frames = [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]].map((c) => fill(4, 3, c));
+  const out = await apng(frames, { w: 4, h: 3 }, { num: 900, den: 3000 });
   const chunks = pngChunks(out);
-  assert.deepEqual(chunks.map((c) => c.type), ["IHDR", "acTL", "fcTL", "IDAT", "fcTL", "fdAT", "fcTL", "fdAT", "IEND"]);
-  const u32 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint32(at);
-  const u16 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint16(at);
-  const acTL = chunks[1].data;
-  assert.deepEqual([u32(acTL, 0), u32(acTL, 4)], [3, 0], "not 3 frames looping for ever");
+  assert.deepEqual(chunks.map((c) => c.type), ["IHDR", "PLTE", "acTL", "fcTL", "IDAT", "fcTL", "fdAT", "fcTL", "fdAT", "IEND"]);
+  assert.equal(chunks[0].data[9], 3, "not a palette image");
+  assert.deepEqual([u32(chunks[2].data, 0), u32(chunks[2].data, 4)], [3, 0], "not 3 frames looping for ever");
   const numbered = chunks.filter((c) => c.type === "fcTL" || c.type === "fdAT").map((c) => u32(c.data, 0));
   assert.deepEqual(numbered, [0, 1, 2, 3, 4], "sequence numbers are not 0, 1, 2…");
-  for (const control of chunks.filter((c) => c.type === "fcTL")) {
-    assert.deepEqual([u32(control.data, 4), u32(control.data, 8), u16(control.data, 20), u16(control.data, 22)], [4, 3, 900, 3000]);
-  }
   const view = new DataView(out.buffer);
   for (let at = 8; at < out.length; ) {
     const length = view.getUint32(at);
     assert.equal(view.getUint32(at + 8 + length), crc32(out.subarray(at + 4, at + 8 + length)), "a chunk's CRC is wrong");
     at += 12 + length;
   }
+  const played = await playApng(out);
+  assert.deepEqual(played.frames.map((f) => f.slice(0, 4)), [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]]);
+  assert.deepEqual(played.delays, [[900, 3000], [900, 3000], [900, 3000]]);
 });
 
-test("a frame in another pixel format or outside the image is refused rather than written broken", () => {
-  const rgba = solidPng(4, 4, [1, 2, 3, 255]);
-  const rgb = new Uint8Array(rgba);
-  rgb[8 + 8 + 9] = 2;
-  assert.throws(() => apng([{ png: rgba, x: 0, y: 0 }, { png: rgb, x: 0, y: 0 }], { num: 1, den: 10 }), /pixel format/);
-  assert.throws(() => apng([{ png: rgba, x: 0, y: 0 }, { png: solidPng(2, 2, [0, 0, 0, 255]), x: 3, y: 3 }], { num: 1, den: 10 }), /leaves the image/);
+test("a later frame keeps only the region that changed, and a frame like the one before shows that one longer", async () => {
+  const first = fill(6, 4, [20, 40, 60, 255]);
+  const second = new Uint8ClampedArray(first);
+  second.set([250, 200, 10, 255], (2 * 6 + 3) * 4);
+  second.set([250, 200, 10, 255], (1 * 6 + 4) * 4);
+  const out = await apng([first, second, second, first], { w: 6, h: 4 }, { num: 100, den: 1500 });
+  const controls = pngChunks(out).filter((c) => c.type === "fcTL").map((c) => [u32(c.data, 4), u32(c.data, 8), u32(c.data, 12), u32(c.data, 16), u16(c.data, 20)]);
+  assert.deepEqual(controls, [[6, 4, 0, 0, 100], [2, 2, 3, 1, 200], [2, 2, 3, 1, 100]], "frames are not cropped to their changes, or the repeat was not merged");
+  const played = await playApng(out);
+  assert.deepEqual(played.frames.map((f) => Uint8ClampedArray.from(f)), [first, second, first]);
+});
+
+test("an image of 256 colours or fewer keeps every colour; more are brought to the nearest, and clear pixels stay clear", async () => {
+  const few = new Uint8ClampedArray(16 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 37) % 251));
+  few.set([0, 0, 0, 0], 0);
+  assert.deepEqual(Uint8ClampedArray.from((await playApng(await apng([few], { w: 16, h: 4 }, { num: 1, den: 10 }))).frames[0]), few.map((v, i) => (i < 4 ? 0 : v)));
+  const many = new Uint8ClampedArray(40 * 40 * 4).map((_, i) => (i % 4 === 3 ? 255 : Math.floor(i / 4) % 40 * 6 + (i % 4) * 9));
+  many.set([10, 10, 10, 0], 0);
+  const out = await apng([many], { w: 40, h: 40 }, { num: 1, den: 10 });
+  assert.ok(pngChunks(out).find((c) => c.type === "PLTE")!.data.length <= 256 * 3, "more than 256 colours");
+  const [played] = (await playApng(out)).frames;
+  assert.equal(played[3], 0, "a clear pixel is no longer clear");
+  for (let i = 4; i < many.length; i += 4) {
+    const d = Math.hypot(played[i] - many[i], played[i + 1] - many[i + 1], played[i + 2] - many[i + 2]);
+    assert.ok(d < 24, `pixel ${i / 4} moved ${d.toFixed(1)} from its colour`);
+  }
 });
 
 test("a typed character name is trimmed, single-spaced and capped at the game's 20 characters", () => {

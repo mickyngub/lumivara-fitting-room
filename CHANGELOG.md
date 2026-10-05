@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- การ์ดบนบอร์ดเล็กลง 4 ถึง 7 เท่า เหลือราว 50 ถึง 160 KB ต่อใบ หน้าตาเหมือนเดิม · placed cards take 4 to 7 times less room on the board, about 50 to 160 KB each, and look the same
+
 ## 1.3.1
 
 - ถ้าเปิดตัวอย่างไม่ได้หรือโหลดค้าง แผงจะบอกสาเหตุและมีปุ่มลองอีกครั้งที่เริ่มใหม่ได้จริงโดยไม่ต้องปิดแผง การวางการ์ดก็ไม่ค้างอีก · if the preview fails to open or stalls, the panel says why and offers a retry that really starts it again without closing the panel, and placing a card can no longer hang

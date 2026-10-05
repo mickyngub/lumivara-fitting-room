@@ -1,12 +1,17 @@
 /**
- * Animated PNG from plain PNG frames, the format a browser plays by itself in
- * an <img>. The first frame is the whole image; a later one may cover only the
- * region that changed, placed at x, y.
+ * Animated PNG from whole RGBA frames, the format a browser plays by itself in
+ * an <img>. Every frame shares one palette of at most 256 colours, a later
+ * frame keeps only the region that changed, and a frame like the one before
+ * shows that one longer instead, which together keep a card a few times
+ * smaller than whole true-colour frames.
  */
-export type ApngFrame = { png: Uint8Array; x: number; y: number };
 export type Chunk = { type: string; data: Uint8Array };
 
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+const MAX_COLOURS = 256;
+// Alpha counts this much more than a colour channel when a colour is brought to
+// the nearest in the palette, so soft edges keep their shape.
+const ALPHA_WEIGHT = 3;
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -47,63 +52,241 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
   return out;
 }
 
-const header = (chunks: Chunk[]) => {
-  const ihdr = chunks.find((c) => c.type === "IHDR");
-  if (!ihdr) throw new Error("PNG has no IHDR");
-  const view = new DataView(
-    ihdr.data.buffer,
-    ihdr.data.byteOffset,
-    ihdr.data.byteLength,
-  );
-  // Bit depth through interlace: every frame must share them with the image.
-  return {
-    ihdr,
-    w: view.getUint32(0),
-    h: view.getUint32(4),
-    format: ihdr.data.subarray(8).join(),
+function bytes(...fields: [number, 1 | 2 | 4][]): Uint8Array {
+  const out = new Uint8Array(fields.reduce((n, [, size]) => n + size, 0));
+  const view = new DataView(out.buffer);
+  let at = 0;
+  for (const [value, size] of fields) {
+    if (size === 4) view.setUint32(at, value);
+    else if (size === 2) view.setUint16(at, value);
+    else view.setUint8(at, value);
+    at += size;
+  }
+  return out;
+}
+
+// Every fully clear pixel is the same clear colour, 0.
+const colourAt = (d: Uint8ClampedArray, i: number) =>
+  d[i + 3] === 0
+    ? 0
+    : ((d[i] << 24) | (d[i + 1] << 16) | (d[i + 2] << 8) | d[i + 3]) >>> 0;
+const channel = (colour: number, c: number) => (colour >>> (24 - 8 * c)) & 255;
+
+type Swatch = { colour: number; count: number };
+
+/**
+ * At most 256 colours for all the frames: every colour when there are that few,
+ * otherwise median cut weighted by how many pixels each colour covers, each box
+ * standing for its most common colour so flat pixel art keeps its exact colours.
+ */
+export function paletteOf(frames: Uint8ClampedArray[]): number[] {
+  const counts = new Map<number, number>();
+  for (const d of frames) {
+    for (let i = 0; i < d.length; i += 4) {
+      const c = colourAt(d, i);
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+  }
+  const clear = counts.has(0);
+  counts.delete(0);
+  const room = MAX_COLOURS - (clear ? 1 : 0);
+  const swatches: Swatch[] = [...counts].map(([colour, count]) => ({
+    colour,
+    count,
+  }));
+  const kept =
+    swatches.length <= room
+      ? swatches.map((s) => s.colour)
+      : medianCut(swatches, room).map(
+          (box) => box.reduce((a, b) => (b.count > a.count ? b : a)).colour,
+        );
+  return clear ? [0, ...kept] : kept;
+}
+
+function medianCut(swatches: Swatch[], boxes: number): Swatch[][] {
+  const spread = (box: Swatch[]) => {
+    let best = { c: 0, range: -1 };
+    for (let c = 0; c < 4; c++) {
+      let [lo, hi] = [255, 0];
+      for (const s of box) {
+        const v = channel(s.colour, c);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (hi - lo > best.range) best = { c, range: hi - lo };
+    }
+    return best;
   };
-};
+  const out = [swatches];
+  while (out.length < boxes) {
+    let pick = -1;
+    let score = 0;
+    out.forEach((box, i) => {
+      if (box.length < 2) return;
+      const s = spread(box).range * box.reduce((n, w) => n + w.count, 0);
+      if (s > score) [pick, score] = [i, s];
+    });
+    if (pick < 0) break;
+    const box = out[pick];
+    const { c } = spread(box);
+    box.sort((a, b) => channel(a.colour, c) - channel(b.colour, c));
+    const half = box.reduce((n, w) => n + w.count, 0) / 2;
+    let at = 0;
+    for (let seen = 0; at < box.length - 1 && seen + box[at].count < half; at++)
+      seen += box[at].count;
+    const cut = Math.min(box.length - 1, Math.max(1, at));
+    out.splice(pick, 1, box.slice(0, cut), box.slice(cut));
+  }
+  return out;
+}
+
+/** Each colour's place in the palette: its own, or the nearest one's. */
+function indexer(palette: number[]): (colour: number) => number {
+  const exact = new Map(palette.map((c, i) => [c, i]));
+  return (colour) => {
+    const known = exact.get(colour);
+    if (known !== undefined) return known;
+    let best = 0;
+    let bestDistance = Infinity;
+    palette.forEach((p, i) => {
+      let d = 0;
+      for (let c = 0; c < 4; c++)
+        d +=
+          (channel(colour, c) - channel(p, c)) ** 2 *
+          (c === 3 ? ALPHA_WEIGHT : 1);
+      if (d < bestDistance) [best, bestDistance] = [i, d];
+    });
+    exact.set(colour, best);
+    return best;
+  };
+}
+
+async function zlib(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
+  const stream = new Blob([data])
+    .stream()
+    .pipeThrough(new CompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+type Region = { x: number; y: number; w: number; h: number };
+
+/** The box around the pixels that differ between two frames of palette indices, or null when none do. */
+function changed(
+  a: Uint8Array,
+  b: Uint8Array,
+  w: number,
+  h: number,
+): Region | null {
+  let [left, top, right, bottom] = [w, h, -1, -1];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (a[y * w + x] === b[y * w + x]) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      bottom = y;
+    }
+  }
+  return right < 0
+    ? null
+    : { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
+}
+
+// Rows of palette indices, each after PNG's "no filter" byte, which suits palette images best.
+function rows(
+  indices: Uint8Array,
+  width: number,
+  r: Region,
+): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(r.h * (r.w + 1));
+  for (let y = 0; y < r.h; y++) {
+    const from = (r.y + y) * width + r.x;
+    out.set(indices.subarray(from, from + r.w), y * (r.w + 1) + 1);
+  }
+  return out;
+}
 
 /** Loops the frames for ever, each shown for delay.num / delay.den seconds. */
-export function apng(
-  frames: ApngFrame[],
+export async function apng(
+  frames: Uint8ClampedArray[],
+  size: { w: number; h: number },
   delay: { num: number; den: number },
-): Uint8Array<ArrayBuffer> {
+): Promise<Uint8Array<ArrayBuffer>> {
   if (!frames.length) throw new Error("no frames");
-  const parsed = frames.map((f) => ({ ...f, chunks: pngChunks(f.png) }));
-  const image = header(parsed[0].chunks);
+  const { w, h } = size;
+  if (frames.some((f) => f.length !== w * h * 4))
+    throw new Error("a frame is not the image's size");
+  const palette = paletteOf(frames);
+  const indexOf = indexer(palette);
+  const indexed = frames.map((d) => {
+    const out = new Uint8Array(w * h);
+    for (let p = 0; p < out.length; p++) out[p] = indexOf(colourAt(d, p * 4));
+    return out;
+  });
+  const shown: { region: Region; indices: Uint8Array; frames: number }[] = [
+    { region: { x: 0, y: 0, w, h }, indices: indexed[0], frames: 1 },
+  ];
+  for (let i = 1; i < indexed.length; i++) {
+    const region = changed(indexed[i - 1], indexed[i], w, h);
+    if (region) shown.push({ region, indices: indexed[i], frames: 1 });
+    else shown[shown.length - 1].frames++;
+  }
+  const lastOpaque = palette.reduce(
+    (last, c, i) => (channel(c, 3) < 255 ? i : last),
+    -1,
+  );
   const parts: Uint8Array[] = [
     new Uint8Array(SIGNATURE),
-    chunk("IHDR", image.ihdr.data),
-    chunk("acTL", u32s(frames.length, 0)),
+    chunk(
+      "IHDR",
+      bytes([w, 4], [h, 4], [8, 1], [3, 1], [0, 1], [0, 1], [0, 1]),
+    ),
+    chunk(
+      "PLTE",
+      new Uint8Array(
+        palette.flatMap((c) => [channel(c, 0), channel(c, 1), channel(c, 2)]),
+      ),
+    ),
+    ...(lastOpaque >= 0
+      ? [
+          chunk(
+            "tRNS",
+            new Uint8Array(
+              palette.slice(0, lastOpaque + 1).map((c) => channel(c, 3)),
+            ),
+          ),
+        ]
+      : []),
+    chunk("acTL", bytes([shown.length, 4], [0, 4])),
   ];
   let sequence = 0;
-  parsed.forEach((frame, i) => {
-    const own = header(frame.chunks);
-    if (own.format !== image.format)
-      throw new Error(`frame ${i} is not in the first frame's pixel format`);
-    if (frame.x + own.w > image.w || frame.y + own.h > image.h)
-      throw new Error(`frame ${i} leaves the image`);
-    const control = new Uint8Array(26);
-    const view = new DataView(control.buffer);
-    [sequence++, own.w, own.h, frame.x, frame.y].forEach((v, k) =>
-      view.setUint32(k * 4, v),
+  for (const [i, frame] of shown.entries()) {
+    const { x, y, w: fw, h: fh } = frame.region;
+    parts.push(
+      chunk(
+        "fcTL",
+        bytes(
+          [sequence++, 4],
+          [fw, 4],
+          [fh, 4],
+          [x, 4],
+          [y, 4],
+          [delay.num * frame.frames, 2],
+          [delay.den, 2],
+          [0, 1],
+          [0, 1],
+        ),
+      ),
     );
-    view.setUint16(20, delay.num);
-    view.setUint16(22, delay.den);
-    parts.push(chunk("fcTL", control));
-    for (const { type, data } of frame.chunks) {
-      if (type !== "IDAT") continue;
-      if (i === 0) {
-        parts.push(chunk("IDAT", data));
-      } else {
-        const body = new Uint8Array(4 + data.length);
-        new DataView(body.buffer).setUint32(0, sequence++);
-        body.set(data, 4);
-        parts.push(chunk("fdAT", body));
-      }
+    const data = await zlib(rows(frame.indices, w, frame.region));
+    if (i === 0) parts.push(chunk("IDAT", data));
+    else {
+      const body = new Uint8Array(4 + data.length);
+      new DataView(body.buffer).setUint32(0, sequence++);
+      body.set(data, 4);
+      parts.push(chunk("fdAT", body));
     }
-  });
+  }
   parts.push(chunk("IEND", new Uint8Array(0)));
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
@@ -111,12 +294,5 @@ export function apng(
     out.set(p, at);
     at += p.length;
   }
-  return out;
-}
-
-function u32s(...values: number[]): Uint8Array {
-  const out = new Uint8Array(values.length * 4);
-  const view = new DataView(out.buffer);
-  values.forEach((v, i) => view.setUint32(i * 4, v));
   return out;
 }

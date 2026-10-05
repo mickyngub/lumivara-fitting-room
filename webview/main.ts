@@ -1,5 +1,5 @@
 import { CARD, FRAME, LOGO, PLATE } from "../src/card";
-import { apng, type ApngFrame } from "../src/art/apng";
+import { apng } from "../src/art/apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, NameFrame, WingInfo } from "../src/game/types";
 import { MAX_OWN_WINGS, type DriverToWebview, type SavedWing, type WebviewToDriver } from "../src/messages";
@@ -527,12 +527,6 @@ const drawdyLogo = () =>
     return image;
   })());
 
-async function pngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) throw new Error("ทำภาพการ์ดไม่สำเร็จ");
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
 const dataUrl = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -564,7 +558,7 @@ async function exportCard(l: Look): Promise<string> {
   const art = frame ? await nameFrameArt(frame) : undefined;
   const logo = await drawdyLogo();
   const overlay = frameCanvas(FRAME_GRID.scale);
-  const frames: ApngFrame[] = [];
+  const frames: Uint8ClampedArray[] = [];
   for (let k = 0; k < cardFrames; k++) {
     const shot = await exporter.capture(sceneAt(l, direction, (k * loopMs) / cardFrames));
     const card = h("canvas", { width: CARD.w, height: CARD.h });
@@ -581,9 +575,9 @@ async function exportCard(l: Look): Promise<string> {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
-    frames.push({ png: await pngBytes(card), x: 0, y: 0 });
+    frames.push(ctx.getImageData(0, 0, CARD.w, CARD.h).data);
   }
-  const image = apng(frames, { num: Math.round(loopMs), den: cardFrames * 1000 });
+  const image = await apng(frames, { w: CARD.w, h: CARD.h }, { num: Math.round(loopMs), den: cardFrames * 1000 });
   return dataUrl(new Blob([image], { type: "image/png" }));
 }
 
