@@ -12,7 +12,7 @@ import { EFFECTS, type Effect } from "../src/art/effects";
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
-import { dyePixels, hexToHsl, mainColour } from "../src/art/dye";
+import { dyePixels, dyeShades, hexToHsl, hslToRgb, mainColour, type Hsl } from "../src/art/dye";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
@@ -62,7 +62,7 @@ let wingsId: string | null = null;
 // Each wing keeps the colour it was given.
 const wingDyes = new Map<string, string>();
 const wingDye = () => (wingsId ? (wingDyes.get(wingsId) ?? null) : null);
-const WING_DYES = [
+const DYES = [
   { hex: "#e5484d", name: "แดง" },
   { hex: "#3fbf6a", name: "เขียว" },
   { hex: "#38b6f2", name: "ฟ้า" },
@@ -73,6 +73,9 @@ const WING_DYES = [
 ];
 const CUSTOM_DYE = "#7ec8ff";
 let accessoryId: string | null = null;
+// Each accessory keeps the colour it was given.
+const accessoryDyes = new Map<string, string>();
+const accessoryDye = () => (accessoryId ? (accessoryDyes.get(accessoryId) ?? null) : null);
 let nameFrameId: string | null = null;
 const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
 type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
@@ -113,6 +116,11 @@ function h<K extends keyof HTMLElementTagNameMap>(
 
 const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
 const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
+// Each look keeps the colours its clothes' parts were given.
+const lookDyes = new Map<string, (string | null)[]>();
+const lookDyesOf = (id: string) => lookDyes.get(id) ?? [];
+const PART_NAMES = ["สีหลัก", "สีรอง", "สีที่ 3"];
+const lookParts = (): Hsl[] => (catalog && live ? live.partsOf(look()) : []);
 const png = (b64: string) => `data:image/png;base64,${b64}`;
 // A look without the chosen pose (cast is the Mage's) stands instead, and gets the pose back when it is chosen again.
 const poseOf = (l: Look): PoseDef => posesFor(l).find((p) => p.id === poseId) ?? poseById("idle");
@@ -124,7 +132,9 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
     look: l,
     wings: wingsId,
     dye: wingDye(),
+    lookDyes: lookDyesOf(l.id),
     accessory: accessoryId,
+    accessoryDye: accessoryDye(),
     pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
     wingMs: f.wingMs,
     loop: f.loop,
@@ -230,25 +240,38 @@ function renderClasses(): void {
   );
 }
 
+// A tile whose look can be dyed carries the colour its clothes were given.
+function dyeable(tile: HTMLElement, l: Look): HTMLElement {
+  tile.dataset.look = l.id;
+  tile.append(h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }));
+  return tile;
+}
+
 function renderFashion(): void {
   const plain = plainLook();
   const outfits = outfitsOf(classId);
   const withOutfits = CLASS_LOOKS.filter((c) => outfitsOf(c.classId).length).map((c) => c.className).join(", ");
   document.getElementById("fashion")!.replaceChildren(
-    pick(plain, "ชุดปกติ", outfitId === null, () => {
-      outfitId = null;
-      renderPickers();
-    }),
+    dyeable(
+      pick(plain, "ชุดปกติ", outfitId === null, () => {
+        outfitId = null;
+        renderPickers();
+      }),
+      plain,
+    ),
     ...outfits.map((o) =>
-      pick(
+      dyeable(
+        pick(
+          o,
+          o.name,
+          outfitId === o.id,
+          () => {
+            outfitId = o.id;
+            renderPickers();
+          },
+          "แฟชั่น",
+        ),
         o,
-        o.name,
-        outfitId === o.id,
-        () => {
-          outfitId = o.id;
-          renderPickers();
-        },
-        "แฟชั่น",
       ),
     ),
     ...(outfits.length
@@ -281,6 +304,7 @@ function renderChoices(): void {
     .querySelectorAll<HTMLElement>("[data-name-frame]")
     .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.nameFrame || null) === nameFrameId)));
   syncWingDyes();
+  syncLookDyes();
   const current = poseOf(look()).id;
   document.getElementById("poses")!.replaceChildren(
     ...posesFor(look()).map((p) =>
@@ -625,16 +649,13 @@ function buildLayout(): void {
     h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }, ...skeletons(5, "look")),
     h("h2", {}, "ชุดแฟชั่น"),
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
+    dyeTray(LOOK_TRAY),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
-    h(
-      "div",
-      { id: "wing-tray", class: "wing-tray", hidden: true },
-      h("p", { class: "wing-tray-head" }, h("span", { id: "wing-tray-title" })),
-      h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
-    ),
+    dyeTray(WING_TRAY),
     h("h2", {}, "เครื่องประดับ"),
-    h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ" }),
+    h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ", onscroll: () => syncDyes(ACCESSORY_TRAY) }),
+    dyeTray(ACCESSORY_TRAY),
     h(
       "div",
       { class: "actions" },
@@ -665,8 +686,10 @@ function buildLayout(): void {
   renderName();
   renderBackgrounds();
   renderFrames();
-  renderWingDyes();
+  renderDyes(WING_TRAY);
+  renderDyes(LOOK_TRAY);
   renderAccessories();
+  renderDyes(ACCESSORY_TRAY);
   requestAnimationFrame(animateFxThumbs);
 }
 
@@ -719,6 +742,7 @@ function startStage(): void {
   liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);
   void liveStage.ready.then(() => {
     fitStage();
+    syncLookDyes();
     // One more frame so the character is drawn before the loading cover lifts.
     requestAnimationFrame(() => {
       document.querySelector(".stage")?.classList.remove("loading");
@@ -762,7 +786,7 @@ function renderWings(): void {
         },
         w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
         h("span", {}, w.name),
-        h("i", { class: "wing-chip", "aria-hidden": "true", hidden: true }),
+        h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
       ),
     ),
   );
@@ -792,7 +816,7 @@ function dyedIcon(url: string, hex: string): Promise<string> {
 function paintWingTile(tile: HTMLElement): void {
   const id = tile.dataset.wings;
   const dye = id ? wingDyes.get(id) : undefined;
-  const chip = tile.querySelector<HTMLElement>(".wing-chip");
+  const chip = tile.querySelector<HTMLElement>(".dye-chip");
   if (chip) {
     chip.hidden = !dye;
     chip.style.background = dye ?? "";
@@ -812,39 +836,143 @@ function paintWingTile(tile: HTMLElement): void {
   );
 }
 
-// Built once: re-rendering would close the colour picker while it is being dragged.
-function renderWingDyes(): void {
-  document.getElementById("wing-dyes")!.replaceChildren(
-    h("button", { type: "button", class: "swatch swatch-none", title: "สีเดิม", "aria-label": "สีเดิม", "data-dye": "", onclick: () => setWingDye(null) }),
-    ...WING_DYES.map((d) =>
-      h("button", { type: "button", class: "swatch", title: d.name, "aria-label": d.name, "data-dye": d.hex, style: `background:${d.hex}`, onclick: () => setWingDye(d.hex) }),
-    ),
+/** One row of colour swatches; a look's parts each get one, named after the part. */
+type Swatches = {
+  id: string;
+  label: string;
+  current: () => string | null;
+  set: (hex: string | null) => void;
+  part?: string;
+};
+
+/** Rows of swatches in a tray pointing at the tile they colour. */
+type DyeTray = {
+  tray: string;
+  rows: () => Swatches[];
+  tile: () => HTMLElement | null;
+  /** The tray's heading, or null while there is nothing to colour. */
+  title: () => string | null;
+};
+
+const WING_TRAY: DyeTray = {
+  tray: "wing-tray",
+  rows: () => [{ id: "wing-dyes", label: "สีปีก", current: wingDye, set: setWingDye }],
+  tile: () => (wingsId ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`) : null),
+  title: () => (wingsId ? `สีของ ${WINGS.find((w) => w.id === wingsId)?.name ?? "ปีก"}` : null),
+};
+
+const hexOf = (c: Hsl) => `#${hslToRgb(c).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+
+const LOOK_TRAY: DyeTray = {
+  tray: "look-tray",
+  rows: () =>
+    lookParts().map((part, k) => ({
+      id: `look-dyes-${k}`,
+      label: PART_NAMES[k],
+      part: hexOf(part),
+      current: () => lookDyesOf(look().id)[k] ?? null,
+      set: (hex) => setLookDye(k, hex),
+    })),
+  tile: () => (catalog ? document.querySelector<HTMLElement>(`[data-look="${look().id}"]`) : null),
+  title: () => (lookParts().length ? `สีของ ${outfitId ? look().name : "ชุดปกติ"}` : null),
+};
+
+const ACCESSORY_TRAY: DyeTray = {
+  tray: "accessory-tray",
+  rows: () => [{ id: "accessory-dyes", label: "สีเครื่องประดับ", current: accessoryDye, set: setAccessoryDye }],
+  tile: () => (accessoryId ? document.querySelector<HTMLElement>(`[data-accessory="${accessoryId}"]`) : null),
+  title: () => (accessoryId ? `สีของ ${ACCESSORIES.find((a) => a.id === accessoryId)?.name ?? "เครื่องประดับ"}` : null),
+};
+
+// The caret stays this far inside the tray when its tile is scrolled out of view.
+const CARET_INSET = 14;
+
+const dyeTray = (t: DyeTray) =>
+  h(
+    "div",
+    { id: t.tray, class: "dye-tray", hidden: true },
+    h("p", { class: "dye-tray-head" }, h("span", { class: "dye-tray-title" })),
+    h("div", { class: "dye-rows" }),
+  );
+
+const swatchRow = (row: Swatches) =>
+  h(
+    "div",
+    { class: "dye-part" },
+    row.part && h("p", { class: "dye-part-name" }, h("i", { class: "dye-part-chip", style: `background:${row.part}`, "aria-hidden": "true" }), row.label),
     h(
-      "label",
-      { class: "swatch swatch-custom", title: "เลือกสีเอง", "data-dye": "custom" },
-      h("input", { type: "color", value: CUSTOM_DYE, "aria-label": "เลือกสีเอง", oninput: (e: Event) => setWingDye((e.target as HTMLInputElement).value) }),
+      "div",
+      { id: row.id, class: "swatches", role: "radiogroup", "aria-label": row.label },
+      h("button", { type: "button", class: "swatch swatch-none", title: "สีเดิม", "aria-label": "สีเดิม", "data-dye": "", onclick: () => row.set(null) }),
+      ...DYES.map((d) =>
+        h("button", { type: "button", class: "swatch", title: d.name, "aria-label": d.name, "data-dye": d.hex, style: `background:${d.hex}`, onclick: () => row.set(d.hex) }),
+      ),
+      h(
+        "label",
+        { class: "swatch swatch-custom", title: "เลือกสีเอง", "data-dye": "custom" },
+        h("input", { type: "color", value: CUSTOM_DYE, "aria-label": "เลือกสีเอง", oninput: (e: Event) => row.set((e.target as HTMLInputElement).value) }),
+      ),
     ),
   );
-  syncWingDyes();
+
+// Built only when its rows change: re-rendering would close the colour picker while it is being dragged.
+function renderDyes(t: DyeTray): void {
+  document.querySelector(`#${t.tray} .dye-rows`)?.replaceChildren(...t.rows().map(swatchRow));
+  syncDyes(t);
 }
 
-/** Puts each wing's colour on its tile, and the chosen wing's on the swatches and the tray pointing at it. */
-function syncWingDyes(): void {
-  const dye = wingDye();
-  const custom = dye !== null && !WING_DYES.some((d) => d.hex === dye);
-  document.querySelectorAll<HTMLElement>("[data-dye]").forEach((n) => {
-    const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === dye;
-    n.setAttribute("aria-pressed", String(pressed));
-    if (n.dataset.dye === "custom") n.style.background = custom ? dye! : "";
-  });
-  document.querySelectorAll<HTMLElement>("[data-wings]").forEach(paintWingTile);
-  const tray = document.getElementById("wing-tray");
+/** Marks the chosen colours on the tray's swatches and points the tray at the tile it colours. */
+function syncDyes(t: DyeTray): void {
+  for (const row of t.rows()) {
+    const dye = row.current();
+    const custom = dye !== null && !DYES.some((d) => d.hex === dye);
+    document.querySelectorAll<HTMLElement>(`#${row.id} [data-dye]`).forEach((n) => {
+      const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === dye;
+      n.setAttribute("aria-pressed", String(pressed));
+      if (n.dataset.dye === "custom") n.style.background = custom ? dye! : "";
+    });
+  }
+  const tray = document.getElementById(t.tray);
   if (!tray) return;
-  tray.hidden = !wingsId;
-  const tile = wingsId ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`) : null;
-  if (!tile) return;
-  tray.style.setProperty("--caret-x", `${tile.offsetLeft + tile.offsetWidth / 2 - tray.offsetLeft}px`);
-  document.getElementById("wing-tray-title")!.textContent = `สีของ ${WINGS.find((w) => w.id === wingsId)?.name ?? "ปีก"}`;
+  const title = t.title();
+  tray.hidden = !title;
+  const tile = t.tile();
+  if (!title || !tile) return;
+  const box = tray.getBoundingClientRect();
+  const at = tile.getBoundingClientRect();
+  tray.style.setProperty("--caret-x", `${Math.min(box.width - CARET_INSET, Math.max(CARET_INSET, at.left + at.width / 2 - box.left))}px`);
+  tray.querySelector(".dye-tray-title")!.textContent = title;
+}
+
+function syncWingDyes(): void {
+  syncDyes(WING_TRAY);
+  document.querySelectorAll<HTMLElement>("[data-wings]").forEach(paintWingTile);
+}
+
+let lookRows = "";
+
+function syncLookDyes(): void {
+  const rows = catalog ? `${look().id}:${lookParts().length}` : "";
+  if (rows !== lookRows) {
+    lookRows = rows;
+    renderDyes(LOOK_TRAY);
+  } else syncDyes(LOOK_TRAY);
+  document.querySelectorAll<HTMLElement>("[data-look]").forEach((tile) => {
+    const chip = tile.querySelector<HTMLElement>(".dye-chip");
+    const dye = lookDyesOf(tile.dataset.look!).find(Boolean);
+    if (!chip) return;
+    chip.hidden = !dye;
+    chip.style.background = dye ?? "";
+  });
+}
+
+function setLookDye(part: number, hex: string | null): void {
+  if (!catalog) return;
+  const dyes = [...lookDyesOf(look().id)];
+  dyes[part] = hex;
+  if (dyes.some(Boolean)) lookDyes.set(look().id, Array.from(dyes, (d) => d ?? null));
+  else lookDyes.delete(look().id);
+  syncLookDyes();
 }
 
 function setWingDye(hex: string | null): void {
@@ -858,9 +986,10 @@ function setWingDye(hex: string | null): void {
 const ACCESSORY_THUMB = { size: 36, headW: 16 };
 
 // The accessory alone, cropped to its pixels and scaled up by whole pixels.
-function accessoryThumb(accessory: Accessory): HTMLCanvasElement {
+function accessoryThumb(accessory: Accessory, dye: string | null = null): HTMLCanvasElement {
   const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
   accessory.paint(px, ACCESSORY_THUMB.headW, 1);
+  if (dye) dyeShades(px.data, accessory.body, hexToHsl(dye));
   let [left, top, right, bottom] = [px.w, px.h, -1, -1];
   for (let y = 0; y < px.h; y++) {
     for (let x = 0; x < px.w; x++) {
@@ -888,16 +1017,39 @@ function renderAccessories(): void {
       h("span", {}, "ไม่ใส่"),
     ),
     ...ACCESSORIES.map((a) =>
-      h("button", { type: "button", class: "fx", "data-accessory": a.id, onclick: () => setAccessory(a.id) }, accessoryThumb(a), h("span", {}, a.name)),
+      h(
+        "button",
+        { type: "button", class: "fx", "data-accessory": a.id, "data-dyed": "", onclick: () => setAccessory(a.id) },
+        accessoryThumb(a),
+        h("span", {}, a.name),
+        h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
+      ),
     ),
   );
   syncAccessories();
 }
 
+/** Marks the chosen accessory and shows each in the colour it was given. */
 function syncAccessories(): void {
-  document
-    .querySelectorAll<HTMLElement>("[data-accessory]")
-    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.accessory || null) === accessoryId)));
+  document.querySelectorAll<HTMLElement>("[data-accessory]").forEach((n) => {
+    n.setAttribute("aria-pressed", String((n.dataset.accessory || null) === accessoryId));
+    const accessory = ACCESSORIES.find((a) => a.id === n.dataset.accessory);
+    const dye = accessory ? (accessoryDyes.get(accessory.id) ?? "") : "";
+    if (!accessory || n.dataset.dyed === dye) return;
+    n.dataset.dyed = dye;
+    n.querySelector(".acc-thumb")?.replaceWith(accessoryThumb(accessory, dye || null));
+    const chip = n.querySelector<HTMLElement>(".dye-chip")!;
+    chip.hidden = !dye;
+    chip.style.background = dye;
+  });
+  syncDyes(ACCESSORY_TRAY);
+}
+
+function setAccessoryDye(hex: string | null): void {
+  if (!accessoryId) return;
+  if (hex) accessoryDyes.set(accessoryId, hex);
+  else accessoryDyes.delete(accessoryId);
+  syncAccessories();
 }
 
 function setAccessory(id: string | null): void {
@@ -977,6 +1129,8 @@ buildLayout();
 addEventListener("resize", () => {
   fitStage();
   syncWingDyes();
+  syncLookDyes();
+  syncDyes(ACCESSORY_TRAY);
 });
 send({ type: "ready" });
 void load();

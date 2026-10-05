@@ -9,7 +9,9 @@
 - ปุ่มวางลงบอร์ดแสดงสถานะในตัวปุ่ม ไม่มีข้อความดันหน้าจอ · the place button shows its progress itself, so nothing on the panel moves
 - การ์ดบนบอร์ดเป็นชิ้นเดียว ลาก กด shift หรือดับเบิลคลิกก็ไม่แยกชิ้นและไม่กระพริบ · a placed card is one element, so dragging, shift-clicking or double-clicking can't pull it apart or make it flicker
 - การ์ดบนบอร์ดกว้างขึ้น 8 px และสูงขึ้น 24 px ตัวละครยังอยู่กลางภาพ · the placed card is 8 px wider and 24 px taller (424 × 480), with the character still centred
-- เครื่องประดับ: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ และมงกุฎดอกไม้ อยู่บนหัวทุกท่าและทุกทิศ · accessories: a halo, crown, cat ears, devil horns and a flower crown that stay on the head in every pose and direction
+- เครื่องประดับ 14 แบบ: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ มงกุฎดอกไม้ หมวกแม่มด หมวกทรงสูง หูกระต่าย หูจิ้งจอก โบว์ หูฟัง ต้นอ่อน มงกุฎเจ้าหญิง และเขากวาง อยู่บนหัวทุกท่าและทุกทิศ และเปลี่ยนสีได้ 7 สี หรือเลือกสีเอง · 14 accessories: a halo, crown, cat ears, devil horns, flower crown, witch hat, top hat, bunny ears, fox ears, bow, headphones, sprout, tiara and antlers that stay on the head in every pose and direction, each in its own colour or one of 7 or any you pick
+- สีชุด: เปลี่ยนสีชุดปกติหรือชุดแฟชั่นได้ทีละส่วน สูงสุด 3 ส่วน 7 สี หรือเลือกสีเอง ผิว หน้า และผมยังเป็นสีเดิม ชุดแต่ละแบบจำสีของตัวเอง · outfit colours: dye a plain look or a fashion outfit part by part, up to three parts, in 7 colours or any you pick, with skin, faces and hair kept as drawn and each look remembering its colours
+- พื้นหลังเคลื่อนไหวเพิ่ม 10 แบบตามแผนที่ในเกม: หิมะ ลาวา คริสตัล พายุ หิ่งห้อย ใต้น้ำ ทะเลทราย คืนจันทร์ ทุ่งหญ้า และสวรรค์ · 10 more animated backgrounds themed on the game's areas: snowfall, lava, crystal, storm, fireflies, underwater, desert, moonlit night, meadow and heaven
 
 ## 1.1.0
 

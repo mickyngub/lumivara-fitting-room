@@ -14,7 +14,7 @@ import { cleanName, NAME_MAX } from "../src/name";
 import { EFFECTS } from "../src/art/effects";
 import { FRAME_GRID, FRAME_STYLES, paintFrame } from "../src/art/frames";
 import { pixels } from "../src/art/pixels";
-import { dyePixels, dyeRgb, hexToHsl, hslToRgb, mainColour, rgbToHsl } from "../src/art/dye";
+import { clothParts, dyeCloth, dyePixels, dyeRgb, dyeShades, hexToHsl, hslToRgb, mainColour, rgbToHsl } from "../src/art/dye";
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { findHeads } from "../src/game/head";
 
@@ -430,6 +430,55 @@ test("a dyed tint can keep its lightness, so the far wing stays as shaded", () =
   assert.ok(Math.abs(after.h - 199) < 5, `far hue is ${after.h}`);
 });
 
+// One standing frame: a face in the shadow tone of the brown tunic under it,
+// with a grey belt, a blue trim and a dark outline.
+const tunicSheet = (hair?: string) => {
+  const sheet = { cell: { w: 12, h: 20 }, baseline: 20, rows: [{ anim: "idle", dir: "south", count: 1 }] };
+  const data = new Uint8ClampedArray(12 * 20 * 4);
+  const paint = (x: number, y: number, w: number, h: number, hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) data.set([r, g, b, 255], (yy * 12 + xx) * 4);
+  };
+  paint(3, 0, 6, 6, "#8a5a3c");
+  if (hair) paint(3, 0, 6, 2, hair);
+  paint(2, 7, 8, 9, "#7a4a28");
+  paint(2, 11, 8, 1, "#808080");
+  paint(2, 15, 8, 1, "#3060c0");
+  paint(2, 16, 8, 1, "#1a1010");
+  const heads = findHeads(data, 12, sheet, () => 6);
+  return { data, sheet, heads, at: (x: number, y: number) => [...data.slice((y * 12 + x) * 4, (y * 12 + x) * 4 + 3)] };
+};
+const hueAt = (pixel: number[]) => rgbToHsl(pixel[0], pixel[1], pixel[2]).h;
+
+test("an outfit's clothes split into colour parts, each dyed on its own, while the face, greys and outline stay as drawn", () => {
+  const { data, sheet, heads, at } = tunicSheet();
+  const cloth = clothParts(data, 12, sheet, heads)!;
+  assert.deepEqual(cloth.parts.map((p) => Math.round(p.h)), [Math.round(hueAt(at(4, 8))), Math.round(hueAt(at(4, 15)))], "the tunic and the trim are not its parts");
+  const before = { face: at(5, 2), belt: at(4, 11), trim: at(4, 15), outline: at(4, 16) };
+  dyeCloth(data, 12, sheet, heads, cloth, [hexToHsl("#38b6f2"), null]);
+  assert.ok(Math.abs(hueAt(at(4, 8)) - 199) < 5, "the tunic was not dyed blue");
+  assert.deepEqual({ face: at(5, 2), belt: at(4, 11), trim: at(4, 15), outline: at(4, 16) }, before);
+  const trimOnly = tunicSheet();
+  dyeCloth(trimOnly.data, 12, trimOnly.sheet, trimOnly.heads, cloth, [null, hexToHsl("#3fbf6a")]);
+  assert.ok(Math.abs(hueAt(trimOnly.at(4, 15)) - hexToHsl("#3fbf6a").h) < 5, "the trim was not dyed green on its own");
+  assert.deepEqual(trimOnly.at(4, 8), tunicSheet().at(4, 8), "dyeing the trim moved the tunic");
+});
+
+test("a warm colour inside the head keeps its colour even where the same colour is dyed on the body", () => {
+  const { data, sheet, heads, at } = tunicSheet("#7a4a28");
+  const hair = at(5, 0);
+  const cloth = clothParts(data, 12, sheet, heads)!;
+  dyeCloth(data, 12, sheet, heads, cloth, [hexToHsl("#38b6f2"), null]);
+  assert.deepEqual(at(5, 0), hair, "hair the colour of the tunic was dyed with it");
+  assert.ok(Math.abs(hueAt(at(4, 8)) - 199) < 5, "the tunic was not dyed blue");
+});
+
+test("a look with no coloured clothes has nothing to dye", () => {
+  const sheet = { cell: { w: 4, h: 4 }, baseline: 4, rows: [{ anim: "idle", dir: "south", count: 1 }] };
+  const grey = new Uint8ClampedArray(4 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : 128));
+  assert.equal(clothParts(grey, 4, sheet, findHeads(grey, 4, sheet, () => 2)), null);
+});
+
 test("the head is found at the top of each frame, and a frame holding something over its head keeps the idle head", () => {
   const cell = { w: 20, h: 24 };
   const sheet = { cell, baseline: 22, rows: [{ anim: "idle", dir: "south", count: 2 }, { anim: "attack", dir: "south", count: 1 }] };
@@ -484,6 +533,26 @@ test("every accessory sits on the head, stays inside its texture, mirrors about 
       assert.ok(unmatched <= 4, `${a.id} is lopsided by ${unmatched} pixels at head width ${headW}`);
       const side = opaqueBox(paintAccessory(a, headW, 0));
       assert.ok(side.right - side.left <= box.right - box.left, `${a.id} is wider from the side`);
+    }
+  }
+});
+
+test("an accessory's colour turns its base shade into the one picked and leaves gems, trims and outline as drawn", () => {
+  const target = hexToHsl("#38b6f2");
+  const picked = hslToRgb(target);
+  const hexAt = (data: Uint8ClampedArray, i: number) => `#${[0, 1, 2].map((k) => data[i + k].toString(16).padStart(2, "0")).join("")}`;
+  for (const a of ACCESSORIES) {
+    const before = paintAccessory(a, 16, 1).data;
+    const seen = new Set<string>();
+    for (let i = 0; i < before.length; i += 4) if (before[i + 3]) seen.add(hexAt(before, i));
+    for (const shade of a.body) assert.ok(seen.has(shade), `${a.id} names ${shade} but does not paint it`);
+    const after = new Uint8ClampedArray(before);
+    dyeShades(after, a.body, target);
+    for (let i = 0; i < before.length; i += 4) {
+      if (!before[i + 3]) continue;
+      const shade = hexAt(before, i);
+      if (shade === a.body[0]) [0, 1, 2].forEach((k) => assert.ok(Math.abs(after[i + k] - picked[k]) <= 1, `${a.id}'s base did not turn into the picked colour`));
+      else if (!a.body.includes(shade)) assert.equal(hexAt(after, i), shade, `${a.id} recoloured ${shade}, which is not its body`);
     }
   }
 });

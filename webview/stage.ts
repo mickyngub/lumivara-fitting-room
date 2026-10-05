@@ -1,7 +1,7 @@
 /// <reference types="phaser" />
 import { createWingKit } from "../src/game/wings.js";
 import { FLAP_PERIOD_MS } from "../src/game/poses";
-import { dyePixels, dyeRgb, hexToHsl, mainColour, type Hsl } from "../src/art/dye";
+import { clothParts, dyeCloth, dyePixels, dyeRgb, dyeShades, hexToHsl, mainColour, type Cloth, type Hsl } from "../src/art/dye";
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { pixels } from "../src/art/pixels";
 import { findHeads, type Head } from "../src/game/head";
@@ -16,6 +16,8 @@ const SHADOW = { w: 25, h: 9, color: 0x122018, alpha: 0.4 };
 const BACKDROP_DEPTH = -1e6;
 // Rows above the baseline (the feet) that the wings attach to.
 const TORSO_BAND = { top: 26, bottom: 16 };
+// A dyed sheet is as big as the look's, so only the latest few are kept.
+const DYED_LOOKS_KEPT = 3;
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
@@ -37,7 +39,11 @@ export type Scene = {
   wings: string | null;
   /** A colour to dye the wings, or none for the game's own. */
   dye?: string | null;
+  /** A colour for each of the look's colour parts, or none for the game's own. */
+  lookDyes?: (string | null)[];
   accessory?: string | null;
+  /** A colour for the accessory's body, or none for its own. */
+  accessoryDye?: string | null;
   pose: Pose;
   wingMs: number;
   loop: BackdropTime;
@@ -84,6 +90,8 @@ export class Stage {
   private wingsId: string | null = null;
   private dye: string | null = null;
   private readonly mainColours = new Map<string, Hsl>();
+  private readonly cloth = new Map<string, Cloth | null>();
+  private readonly dyedLooks: string[] = [];
   private override: Scene | null = null;
   private readonly game: Phaser.Game;
 
@@ -297,6 +305,39 @@ export class Stage {
     for (const swirl of parts.swirls) swirl.setTexture(this.dyedTexture(swirl.texture.key, dye, main));
   }
 
+  private clothOf(look: Look): Cloth | null {
+    let cloth = this.cloth.get(look.id);
+    if (cloth === undefined) {
+      const { canvas, image } = this.sourcePixels(look.id);
+      this.cloth.set(look.id, (cloth = clothParts(image.data, canvas.width, look.sheet, this.headsOf(look))));
+    }
+    return cloth;
+  }
+
+  /** The colour parts of a look's clothes, largest first; none before the stage has booted. */
+  partsOf(look: Look): Hsl[] {
+    return this.textures ? (this.clothOf(look)?.parts ?? []) : [];
+  }
+
+  /** The look's sheet with its clothes' parts dyed, framed like the game's sprite sheet. */
+  private lookTexture(look: Look, dyes: (string | null)[]): string {
+    const cloth = dyes.some(Boolean) ? this.clothOf(look) : null;
+    if (!cloth) return look.id;
+    const key = `${look.id}~${dyes.join(",")}`;
+    if (this.textures.exists(key)) return key;
+    const { canvas, ctx, image } = this.sourcePixels(look.id);
+    const targets = cloth.parts.map((_, k) => (dyes[k] ? hexToHsl(dyes[k]!) : null));
+    dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targets);
+    ctx.putImageData(image, 0, 0);
+    const texture = this.textures.addCanvas(key, canvas)!;
+    const { w, h } = look.sheet.cell;
+    const cols = Math.floor(canvas.width / w);
+    for (let i = 0; i < cols * Math.floor(canvas.height / h); i++) texture.add(i, 0, (i % cols) * w, Math.floor(i / cols) * h, w, h);
+    this.dyedLooks.push(key);
+    if (this.dyedLooks.length > DYED_LOOKS_KEPT) this.textures.remove(this.dyedLooks.shift()!);
+    return key;
+  }
+
   private headsOf(look: Look): Head[][] {
     let heads = this.heads.get(look.id);
     if (!heads) {
@@ -307,11 +348,12 @@ export class Stage {
     return heads;
   }
 
-  private accessoryTexture(accessory: Accessory, headW: number, facing: number): string {
-    const key = `accessory:${accessory.id}:${headW}:${facing}`;
+  private accessoryTexture(accessory: Accessory, headW: number, facing: number, dye: string | null): string {
+    const key = `accessory:${accessory.id}:${headW}:${facing}:${dye ?? ""}`;
     if (!this.textures.exists(key)) {
       const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
       accessory.paint(px, headW, facing);
+      if (dye) dyeShades(px.data, accessory.body, hexToHsl(dye));
       const canvas = document.createElement("canvas");
       canvas.width = px.w;
       canvas.height = px.h;
@@ -334,7 +376,7 @@ export class Stage {
     const facing = Math.round(Math.abs(Math.sin((DIRECTIONS.indexOf(pose.direction) * Math.PI) / 4)) * 100) / 100;
     const bob = accessory.float ? Math.round(Math.sin((2 * Math.PI * loop.ms) / loop.loopMs) * accessory.float) : 0;
     this.accessory
-      .setTexture(this.accessoryTexture(accessory, head.w, facing))
+      .setTexture(this.accessoryTexture(accessory, head.w, facing, scene.accessoryDye ?? null))
       .setPosition(
         Math.round(bodyX - cell.w / 2 + head.x - 0.5) - ACCESSORY_ART.x,
         this.options.feet.y - baseline + head.top - ACCESSORY_ART.top + bob,
@@ -364,7 +406,7 @@ export class Stage {
     const frame = pose.frame % rows[rowIndex].count;
     const bodyX = feet.x - this.torsoOffset(look, pose.direction);
     this.body
-      .setTexture(look.id, rowIndex * cols + frame)
+      .setTexture(this.lookTexture(look, scene.lookDyes ?? []), rowIndex * cols + frame)
       .setOrigin(0.5, baseline / cell.h)
       .setPosition(bodyX, feet.y);
     this.placeAccessory(scene, rowIndex, frame, bodyX);
