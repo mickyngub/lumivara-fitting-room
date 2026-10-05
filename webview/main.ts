@@ -32,7 +32,6 @@ let stageScale = fitStageScale(MIN_STAGE_W);
 // panel holds at the preview's scale, so the picture fills it.
 const STAGE_W = Math.floor(panelWidth() / stageScale / 2) * 2;
 const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: 67 } };
-const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
 const SAVE_NAME_MS = 400;
@@ -86,8 +85,6 @@ const background = () => BACKGROUNDS.find((b) => b.id === backgroundId) ?? BACKG
 let frameId = FRAME_STYLES[0].id;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let poseId = "idle";
-let autoTurn = true;
-let lastTurn = 0;
 let busy = false;
 let playerName = "";
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -511,7 +508,7 @@ async function exportCard(l: Look): Promise<string> {
     backdrop: cardBackdrop(background()),
   });
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
-  const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
+  const direction = DIRECTIONS[dirIndex];
   const { cardFrames, loopMs } = poseOf(l);
   const lines = nameplate(playerName, plainLook().className);
   await loadNameFont(lines);
@@ -591,7 +588,6 @@ function buildLayout(): void {
   );
   const host = h("div", { id: "stage-host", role: "img", "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน" }, canvasFrame);
   const turn = (delta: number) => {
-    autoTurn = false;
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
   root.replaceChildren(
@@ -717,13 +713,7 @@ function startStage(): void {
     looks: catalog.looks,
     wingTextures: catalog.wingTextures,
     backdrop: stageBackdrop(background()),
-    frame: (now) => {
-      if (autoTurn && !reduced && now - lastTurn > AUTO_TURN_MS) {
-        dirIndex = (dirIndex + DIRECTIONS.length - 1) % DIRECTIONS.length;
-        lastTurn = now;
-      }
-      return sceneAt(look(), DIRECTIONS[dirIndex], reduced ? 0 : now);
-    },
+    frame: (now) => sceneAt(look(), DIRECTIONS[dirIndex], reduced ? 0 : now),
   });
   live = liveStage;
   liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);

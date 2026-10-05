@@ -3,6 +3,7 @@
 ## 1.2.0
 
 - สีปีก: ย้อมปีกได้ 7 สี หรือเลือกสีเอง ทั้งแสง ประกาย และควันของปีกเปลี่ยนสีตาม · wing colours: 7 dyes or any colour you pick, with the wings' glow, sparkles and swirls dyed to match
+- ตัวละครในตัวอย่างหันหน้านิ่ง ไม่หมุนเอง ลากหรือกดลูกศรเพื่อหมุนดู · the preview's character stands still facing you; drag or use the arrows to turn it
 - ตัวอย่างตัวละครอยู่ด้านบนตลอด เลื่อนเลือกของด้านล่างได้โดยไม่หายไป · the preview stays in view while you scroll through the options
 - สีปีกอยู่ที่ปีกที่เลือก ปีกแต่ละแบบจำสีของตัวเอง · each wing carries and remembers its own colour, chosen right under it
 - ปุ่มวางลงบอร์ดแสดงสถานะในตัวปุ่ม ไม่มีข้อความดันหน้าจอ · the place button shows its progress itself, so nothing on the panel moves
