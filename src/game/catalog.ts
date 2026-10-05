@@ -29,6 +29,7 @@ export type Skin = {
   description?: string;
   icon?: string;
   classId?: string;
+  classIds?: string[];
   className?: string;
   atlas?: Atlas;
   wings?: WingPlacement;
@@ -73,7 +74,8 @@ export function isCosmetics(v: unknown): v is Cosmetics {
  * Placement comes from the file; the wing effect (aura, far tint) comes from
  * the bundled wing code until the file carries it. Name frames take their art
  * from the file and their slices from the game's stylesheet, so a frame the
- * stylesheet has not been lifted for yet is left out.
+ * stylesheet has not been lifted for yet is left out. An outfit goes to every
+ * class in its classIds the game has, or to its one classId.
  */
 export function planCatalog(
   c: Cosmetics,
@@ -81,30 +83,32 @@ export function planCatalog(
   frameSlices: Record<string, NameFrameSlices>,
 ): CatalogPlan {
   const classNames = new Map(c.classes.map((k) => [k.id, k.name]));
+  const wearers = (s: Skin) =>
+    (s.classIds ?? (s.classId ? [s.classId] : [])).filter((id) => classNames.has(id));
   const looks: LookSource[] = [
     ...c.skins
-      .filter(
-        (s) =>
-          s.slot === "outfit" &&
-          s.atlas &&
-          s.classId &&
-          classNames.has(s.classId),
-      )
-      .map((s) => ({
-        id: `outfit:${s.id}`,
-        kind: "outfit" as const,
-        itemId: s.id,
-        classId: s.classId!,
-        className: s.className ?? classNames.get(s.classId!)!,
-        name: s.name,
-        description: s.description ?? "",
-        source: s.atlas!.png.replace(/\.png$/, ""),
-        atlas: s.atlas!,
-      })),
+      .filter((s) => s.slot === "outfit" && s.atlas && wearers(s).length)
+      .map((s) => {
+        const classIds = wearers(s);
+        const classId = s.classId && classIds.includes(s.classId) ? s.classId : classIds[0];
+        return {
+          id: `outfit:${s.id}`,
+          kind: "outfit" as const,
+          itemId: s.id,
+          classId,
+          classIds,
+          className: (classId === s.classId && s.className) || classNames.get(classId)!,
+          name: s.name,
+          description: s.description ?? "",
+          source: s.atlas!.png.replace(/\.png$/, ""),
+          atlas: s.atlas!,
+        };
+      }),
     ...c.classes.map((k) => ({
       id: `class:${k.id}`,
       kind: "class" as const,
       classId: k.id,
+      classIds: [k.id],
       className: k.name,
       name: k.name,
       description: "",

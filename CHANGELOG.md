@@ -3,6 +3,7 @@
 ## 1.1.0
 
 - กรอบชื่อ 10 แบบจาก Item Mall ชื่อของคุณอยู่ในกรอบแบบเดียวกับในเกม ทั้งในตัวอย่างและบนการ์ด · the Item Mall's 10 name frames, drawn around your name the way the game draws them, in the preview and on the card
+- ชุดที่ใส่ได้หลายอาชีพขึ้นในทุกอาชีพที่ใส่ได้ เช่น Bloodfang Vampire ของ Swordsman และ Kensei · an outfit several classes can wear shows under each of them, like Bloodfang Vampire for Swordsman and Kensei
 - ตัวอย่างสูงเท่าภาพบนการ์ด ตัวละครยืนที่ตำแหน่งเดียวกัน · the preview is as tall as the card's picture, with the character standing at the same height
 
 ## 1.0.0

@@ -45,7 +45,7 @@ let CLASS_LOOKS: Look[] = [];
 let OUTFITS: Look[] = [];
 let WINGS: WingInfo[] = [];
 let NAME_FRAMES: NameFrame[] = [];
-const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classId === classId);
+const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes(classId));
 
 let classId = "";
 let outfitId: string | null = null;
@@ -210,7 +210,7 @@ function renderClasses(): void {
 function renderFashion(): void {
   const plain = plainLook();
   const outfits = outfitsOf(classId);
-  const withOutfits = [...new Set(OUTFITS.map((o) => o.className))].join(", ");
+  const withOutfits = CLASS_LOOKS.filter((c) => outfitsOf(c.classId).length).map((c) => c.className).join(", ");
   document.getElementById("fashion")!.replaceChildren(
     pick(plain, "ชุดปกติ", outfitId === null, () => {
       outfitId = null;
@@ -300,7 +300,7 @@ let plateDraw = 0;
 function renderName(): void {
   const canvas = document.getElementById("nameplate") as HTMLCanvasElement | null;
   if (!canvas) return;
-  const lines = nameplate(playerName, catalog ? look().className : "");
+  const lines = nameplate(playerName, catalog ? plainLook().className : "");
   const frame = nameFrame();
   const draw = ++plateDraw;
   void Promise.all([loadNameFont(lines), frame && nameFrameArt(frame).catch(() => undefined)]).then(([, art]) => {
@@ -467,7 +467,7 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const direction = autoTurn ? "south" : DIRECTIONS[dirIndex];
   const { cardFrames, loopMs } = poseOf(l);
-  const lines = nameplate(playerName, l.className);
+  const lines = nameplate(playerName, plainLook().className);
   await loadNameFont(lines);
   const frame = nameFrame();
   const art = frame ? await nameFrameArt(frame) : undefined;

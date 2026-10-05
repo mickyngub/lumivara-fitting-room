@@ -12,6 +12,8 @@ export type Look = {
   kind: "outfit" | "class";
   itemId?: string;
   classId: string;
+  /** Every class that can wear the look, classId among them. */
+  classIds: string[];
   className: string;
   name: string;
   description: string;

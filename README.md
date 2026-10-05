@@ -8,7 +8,7 @@
 
 1. ติดตั้งแล้วห้องแต่งตัวจะเปิดขึ้นเอง ครั้งต่อไปกดไอคอน Lumivara ที่แถบด้านขวาของบอร์ด
 2. รอโหลดชุดจากเกมสักครู่ แล้วลากที่ตัวละครหรือกดลูกศรเพื่อหมุนดูรอบตัว
-3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพของมัน เหมือนในเกม)
+3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพที่ชุดนั้นรองรับ เหมือนในเกม)
 4. เลือกปีก และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
 5. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
 6. เลือกกรอบชื่อจาก Item Mall ชื่อของคุณจะอยู่ในกรอบแบบเดียวกับในเกม
@@ -23,7 +23,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 
 1. After installing, the Fitting Room opens on its own; next time, open it from the Lumivara button on the right of the board.
 2. Drag the character or use the arrows to turn it around.
-3. Pick a class, then its plain look or one of its fashion outfits (outfits belong to one class, as in the game), then wings.
+3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it), then wings.
 4. Pick a pose: idle, walk, attack, attack 2 or sit (mages can also cast).
 5. Type your in-game name: it shows under the character with your class, like the game's name tag.
 6. Pick a name frame from the Item Mall: your name sits in it the way the game draws it.

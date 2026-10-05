@@ -38,6 +38,7 @@ const lookWithFrames = (counts: Record<string, number>): Look => ({
   id: "class:test",
   kind: "class",
   classId: "test",
+  classIds: ["test"],
   className: "Test",
   name: "Test",
   description: "",
@@ -82,6 +83,25 @@ test("a wing the game's wing code does not know is listed and drawn with a neutr
   assert.deepEqual(plan.wingsWithoutEffect, ["aurora_wings"]);
   assert.equal(aurora.style.far, neutralFarTint);
   assert.equal(aurora.style.aura, undefined);
+});
+
+test("an outfit several classes can wear is offered to each of them, and classes the game lacks are dropped", () => {
+  const plan = planCatalog(cosmetics, codeStyles, NAME_FRAME_SLICES);
+  const bloodfang = plan.looks.find((l) => l.id === "outfit:bloodfang_vampire")!;
+  assert.deepEqual(bloodfang.classIds, ["swordman", "kensei"]);
+  assert.equal(bloodfang.classId, "swordman");
+  assert.deepEqual(
+    plan.looks.filter((l) => l.kind === "outfit" && l.classIds.includes("kensei")).map((l) => l.itemId),
+    ["azure_kensei", "bloodfang_vampire"],
+  );
+  assert.deepEqual(plan.looks.find((l) => l.id === "outfit:azure_kensei")!.classIds, ["kensei"]);
+  const base = cosmetics.skins.find((s) => s.id === "bloodfang_vampire")!;
+  const pirate = { ...base, id: "pirate_coat", classId: "pirate", className: "Pirate", classIds: ["pirate", "thief"] };
+  const ghost = { ...base, id: "ghost_coat", classId: "pirate", className: "Pirate", classIds: ["pirate"] };
+  const more = planCatalog({ ...cosmetics, skins: [...cosmetics.skins, pirate, ghost] }, codeStyles, NAME_FRAME_SLICES);
+  const coat = more.looks.find((l) => l.id === "outfit:pirate_coat")!;
+  assert.deepEqual([coat.classId, coat.className, coat.classIds], ["thief", "Thief", ["thief"]]);
+  assert.equal(more.looks.some((l) => l.id === "outfit:ghost_coat"), false);
 });
 
 test("name frames take their art from cosmetics.json and their slices from the game's stylesheet", () => {
