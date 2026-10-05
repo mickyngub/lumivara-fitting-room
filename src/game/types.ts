@@ -43,8 +43,8 @@ export type WingStyle = {
 export type Edges = [number, number, number, number];
 
 /**
- * The game's border-image for a name frame: slices in image pixels, widths
- * (equal to the outsets) in ems of the name font, and the gem strip's width.
+ * The game's border-image for a name frame: slices in image pixels, and the
+ * widths (equal to the outsets) and the gem strip's width in label pixels.
  */
 export type NameFrameSlices = { slice: Edges; width: Edges; gemWidth: number };
 

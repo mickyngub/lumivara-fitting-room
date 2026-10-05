@@ -28,6 +28,7 @@ const nameFrame = (id: string) => nameFrames.find((f) => f.id === id)!;
 const measureByLength = (line: NameplateLine) => line.text.length * 3;
 const roomy: Rect = { x: -1000, y: -1000, w: 2000, h: 2000 };
 const nameFontEm = 6;
+const labelPx = 0.5;
 const near = (actual: number, expected: number, what: string) => assert.ok(Math.abs(actual - expected) < 1e-9, `${what}: ${actual} is not ${expected}`);
 const nearRect = (actual: Rect, expected: Rect, what: string) => {
   for (const k of ["x", "y", "w", "h"] as const) near(actual[k], expected[k], `${what}.${k}`);
@@ -93,8 +94,8 @@ test("name frames take their art from cosmetics.json and their slices from the g
   assert.equal(star.url, `${LUMIVARA}/name-frames/celestial_star.png`);
   assert.equal(star.gemUrl, `${LUMIVARA}/name-frames/celestial_star-gem.png`);
   assert.equal(star.icon, `${LUMIVARA}/items/celestial_star.png`);
-  assert.deepEqual(star.slice, [41, 166, 50, 168]);
-  assert.deepEqual(star.width, [1.435, 5.81, 1.75, 5.88]);
+  assert.deepEqual(star.slice, [13, 54, 17, 54]);
+  assert.deepEqual(star.width, [13, 54, 17, 54]);
   assert.deepEqual(plan.nameFramesWithoutSlices, []);
 });
 
@@ -265,15 +266,16 @@ test("a nameplate shows the typed name over the class in brackets, smaller, or t
   assert.deepEqual(nameplate("", "Mage").map((l) => l.text), ["‹Mage›"]);
 });
 
-test("a name frame wraps the padded name label the way the game's border-image does, with the class under it", () => {
+test("a name frame takes the label's place and holds the padded name in its 13 px middle, with the class under it", () => {
   const feet = { x: 50, y: 40 };
   for (const frame of nameFrames) {
     const plate = layoutNameplate(nameplate("mickyngub", "Swordsman"), measureByLength, feet, roomy, frame);
     const { box, area, gem } = plate.frame!;
-    nearRect(box, { x: feet.x - (9 * 3 + 0.6 * nameFontEm) / 2, y: feet.y + 7, w: 9 * 3 + 0.6 * nameFontEm, h: 1.4 * nameFontEm }, `${frame.id} label`);
-    const [t, r, b, l] = frame.width.map((v) => v * nameFontEm);
-    nearRect(area, { x: box.x - l, y: box.y - t, w: box.w + l + r, h: box.h + t + b }, `${frame.id} frame`);
-    nearRect(gem, { x: feet.x - (frame.gemWidth * nameFontEm) / 2, y: area.y, w: frame.gemWidth * nameFontEm, h: area.h }, `${frame.id} gem`);
+    const [t, r, b, l] = frame.width.map((v) => v * labelPx);
+    const labelW = 9 * 3 + 8 * labelPx;
+    nearRect(box, { x: feet.x - labelW / 2, y: feet.y + 7 + t, w: labelW, h: 13 * labelPx }, `${frame.id} label`);
+    nearRect(area, { x: box.x - l, y: feet.y + 7, w: box.w + l + r, h: box.h + t + b }, `${frame.id} frame`);
+    nearRect(gem, { x: feet.x - (frame.gemWidth * labelPx) / 2, y: area.y, w: frame.gemWidth * labelPx, h: area.h }, `${frame.id} gem`);
     const [name, title] = plate.lines;
     near(name.y, box.y + box.h / 2, `${frame.id} name is off the label's middle`);
     near(name.size, nameFontEm, `${frame.id} name size`);
@@ -293,7 +295,7 @@ test("a nameplate too big for the picture shrinks about the top of its label unt
     const { box, area } = plate.frame!;
     assert.ok(inside(area), `${frame.id} leaves the picture`);
     assert.ok(Math.min(area.x - room.x, room.x + room.w - area.x - area.w) < 1e-9, `${frame.id} shrank more than it had to`);
-    near(box.y, feet.y + 7, `${frame.id} label moved off the feet`);
+    near(area.y, feet.y + 7, `${frame.id} frame moved off the feet`);
     near(box.x + box.w / 2, feet.x, `${frame.id} label is off centre`);
     assert.ok(plate.lines.every((l) => l.size < nameFontEm), `${frame.id} text kept its size`);
   }
@@ -304,9 +306,9 @@ test("a nameplate too big for the picture shrinks about the top of its label unt
 
 test("a name frame's nine parts tile its image and its area, corners unstretched and the middle on the label", () => {
   const frame = nameFrame("celestial_star");
-  const image = { w: 340, h: 131 };
+  const image = { w: 111, h: 43 };
   const [t, r, b, l] = frame.slice;
-  const box = { x: 200, y: 100, w: 57, h: 40 };
+  const box = { x: 200, y: 100, w: 57, h: 13 };
   const area = { x: box.x - l, y: box.y - t, w: box.w + l + r, h: box.h + t + b };
   const pieces = slicePieces(frame.slice, image, box, area);
   assert.equal(pieces.length, 9);

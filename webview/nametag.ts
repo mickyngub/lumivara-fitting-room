@@ -12,10 +12,12 @@ export const NAME_FONT =
 const NAME_LINE = { px: 12, color: "#b9eab5" };
 // The class goes under the name, smaller and gold, the way MMO nameplates show a title.
 const CLASS_LINE = { px: 10, color: "#f0d58c" };
-// A framed label's padding and minimum width in ems, from the game's
-// [data-name-frame] rule (checked by scripts/name-frames.mjs).
-const FRAME_PAD = { x: 0.3, y: 0.1 };
-const FRAME_MIN_WIDTH = 2;
+// A framed label, from the game's [data-name-frame] rules (checked by
+// scripts/name-frames.mjs), in label px: 4 px side padding, at least 2em wide,
+// and 13 px tall inside the frame.
+const FRAME_PAD_X = 4;
+const FRAME_MIN_WIDTH_EM = 2;
+const FRAME_INSIDE = 13;
 
 const OUTLINE_OFFSETS = [
   [-1, -1],
@@ -57,10 +59,11 @@ export type PlateLayout = {
 
 /**
  * Where the nameplate goes, in world pixels. A name frame is the game's
- * border-image: the padded name label is the image's middle and the frame
- * reaches out from it by its widths, with the gem strip centred over the
- * stretched seam. A plate that would leave `room` shrinks about the label's
- * top centre until it fits.
+ * pixel-art border-image, one image pixel to a label pixel: the frame takes
+ * the label's place under the feet, the name sits in its 13 px middle, the gem
+ * strip is centred over the stretched seam, and the class goes under the
+ * whole frame. A plate that would leave `room` shrinks about the top centre
+ * until it fits.
  */
 export function layoutNameplate(
   lines: NameplateLine[],
@@ -78,25 +81,26 @@ export function layoutNameplate(
   if (frame) {
     const name = lines.find((l) => l.kind === "name");
     rest = lines.filter((l) => l !== name);
-    const em = NAME_LINE.px / GAME_WORLD_ZOOM;
+    const px = 1 / GAME_WORLD_ZOOM;
+    const em = NAME_LINE.px * px;
     const w = Math.max(
-      (name ? measure(name) : 0) + 2 * FRAME_PAD.x * em,
-      FRAME_MIN_WIDTH * em,
+      (name ? measure(name) : 0) + 2 * FRAME_PAD_X * px,
+      FRAME_MIN_WIDTH_EM * em,
     );
+    const [t, r, b, l] = frame.width.map((v) => v * px);
     const box = {
       x: anchor.x - w / 2,
-      y,
+      y: y + t,
       w,
-      h: (LINE_HEIGHT + 2 * FRAME_PAD.y) * em,
+      h: FRAME_INSIDE * px,
     };
-    const [t, r, b, l] = frame.width.map((v) => v * em);
     const area = {
       x: box.x - l,
-      y: box.y - t,
+      y,
       w: box.w + l + r,
       h: box.h + t + b,
     };
-    const gemW = frame.gemWidth * em;
+    const gemW = frame.gemWidth * px;
     framed = {
       box,
       area,
@@ -258,8 +262,7 @@ export function drawNameplate(
     };
   };
   if (art && plate.frame) {
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingEnabled = false;
     const { image, gem } = art;
     const size = { w: image.naturalWidth, h: image.naturalHeight };
     for (const p of slicePieces(

@@ -7,9 +7,13 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "game", "
 const CHECK = process.argv.includes("--check");
 // The panel lays a frame out from these rules; if the game changes them, the
 // layout in webview/nametag.ts has to change with them.
+const INSIDE = 13;
 const LABEL_RULES = [
-    "[data-name-frame]{border-style:solid;border-width:0;padding:.1em .3em;min-width:2em}",
-    "[data-name-frame]:after{content:\"\";position:absolute;left:50%;top:calc(-1 * var(--nf-t));bottom:calc(-1 * var(--nf-b));width:var(--nf-gem-w);transform:translate(-50%);background-position:center;background-size:100% 100%;",
+    `:root{--nf-inside:${INSIDE}px}`,
+    "[data-name-frame]{border-style:solid;border-width:0;padding:0 4px;min-width:2em;line-height:var(--nf-inside);image-rendering:pixelated}",
+    "[data-name-frame]:after{content:\"\";position:absolute;left:50%;top:calc(-1 * var(--nf-t));bottom:calc(-1 * var(--nf-b));width:var(--nf-gem-w);transform:translate(-50%);background-position:center;background-size:100% 100%;background-repeat:no-repeat;image-rendering:pixelated;",
+    ".world-label[data-name-frame]{margin-top:var(--nf-t)}",
+    ".world-label[data-under-frame]{margin-top:var(--nf-h)}",
 ];
 
 const home = await getText("/");
@@ -20,7 +24,7 @@ for (const rule of LABEL_RULES) {
     if (!css.includes(rule)) throw new Error(`The game's name frame label rule changed in ${stylesheet}; expected ${rule}`);
 }
 
-const ems = (list) => list.trim().split(/\s+/).map((v) => Number(need(v.match(/^([\d.]+)em$/)?.[1], `em length in ${list}`)));
+const pxs = (list) => list.trim().split(/\s+/).map((v) => Number(need(v.match(/^([\d.]+)px$/)?.[1], `px length in ${list}`)));
 const frames = {};
 const urls = {};
 for (const [, id, body] of css.matchAll(/\[data-name-frame=([\w-]+)\]\{([^}]*)\}/g)) {
@@ -29,12 +33,12 @@ for (const [, id, body] of css.matchAll(/\[data-name-frame=([\w-]+)\]\{([^}]*)\}
         `${id} border-image`,
     );
     const [, url, t, r, b, l, width, outset] = image;
-    if (ems(width).join() !== ems(outset).join()) throw new Error(`${id} has a border-image outset unlike its width`);
-    frames[id] = {
-        slice: [t, r, b, l].map(Number),
-        width: ems(width),
-        gemWidth: ems(need(body.match(/--nf-gem-w:([^;]+)/)?.[1], `${id} gem width`))[0],
-    };
+    if (pxs(width).join() !== pxs(outset).join()) throw new Error(`${id} has a border-image outset unlike its width`);
+    const sizes = need(css.match(new RegExp(`\\[data-name-frame=${id}\\],\\[data-under-frame=${id}\\]\\{([^}]*)\\}`))?.[1], `${id} sizes`);
+    const size = (name) => pxs(need(sizes.match(new RegExp(`--nf-${name}:([^;]+)`))?.[1], `${id} --nf-${name}`))[0];
+    if (["t", "r", "b", "l"].map(size).join() !== pxs(width).join()) throw new Error(`${id} has --nf sizes unlike its border-image widths`);
+    if (size("h") !== size("t") + INSIDE + size("b")) throw new Error(`${id} is not ${INSIDE} px inside`);
+    frames[id] = { slice: [t, r, b, l].map(Number), width: pxs(width), gemWidth: size("gem-w") };
     urls[id] = { url, gemUrl: css.match(new RegExp(`\\[data-name-frame=${id}\\]:after\\{background-image:url\\(([^)]+)\\)`))?.[1] };
 }
 need(Object.keys(frames).length, "name frame rules");
