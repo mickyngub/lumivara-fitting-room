@@ -484,14 +484,7 @@ h2 {
     gap: 6px;
 }
 
-.name-frames {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.wing,
-.name-frame {
+.wing {
     display: grid;
     justify-items: center;
     align-content: center;
@@ -504,25 +497,21 @@ h2 {
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.wing img,
-.name-frame img {
+.wing img {
     image-rendering: pixelated;
 }
 
-.wing span,
-.name-frame span {
+.wing span {
     font: 600 10.5px/1.2 var(--serif);
     text-align: center;
     color: var(--parchment);
 }
 
-.wing .none,
-.name-frame .none {
+.wing .none {
     color: var(--faint);
 }
 
-.wing[aria-pressed="true"],
-.name-frame[aria-pressed="true"] {
+.wing[aria-pressed="true"] {
     border-color: var(--gold);
     box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
 }
@@ -556,7 +545,7 @@ h2 {
 .backgrounds {
     display: grid;
     gap: 8px;
-    margin: 10px 0 2px;
+    margin: 4px 0 2px;
 }
 
 .fx-row {
@@ -613,6 +602,27 @@ h2 {
     flex: none;
     width: calc((100% - 24px) / 5);
     scroll-snap-align: start;
+}
+
+.fx img,
+.fx .fx-none {
+    width: 36px;
+    height: 36px;
+    image-rendering: pixelated;
+}
+
+.fx .fx-none {
+    border: 1px dashed var(--navy-line);
+    border-radius: 50%;
+}
+
+.name-frames .fx span {
+    white-space: normal;
+    text-align: center;
+}
+
+.name-frames .skeleton {
+    height: 74px;
 }
 
 .actions {

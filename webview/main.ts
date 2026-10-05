@@ -559,6 +559,9 @@ function buildLayout(): void {
         oninput: onNameInput,
       }),
     ),
+    h("h2", {}, "กรอบชื่อ"),
+    h("div", { id: "name-frames", class: "frames name-frames", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(6, "fx")),
+    h("h2", {}, "พื้นหลัง"),
     h("div", { id: "backgrounds", class: "backgrounds" }),
     h("h2", {}, "กรอบการ์ด"),
     h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
@@ -568,8 +571,6 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
-    h("h2", {}, "กรอบชื่อ"),
-    h("div", { id: "name-frames", class: "name-frames", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(11, "name-frame")),
     h(
       "div",
       { class: "actions" },
@@ -717,14 +718,15 @@ function renderNameFrames(): void {
   document.getElementById("name-frames")!.replaceChildren(
     h(
       "button",
-      { type: "button", class: "name-frame", "data-name-frame": "", onclick: () => setNameFrame(null) },
-      h("span", { class: "none" }, "ไม่ใส่"),
+      { type: "button", class: "fx", "data-name-frame": "", onclick: () => setNameFrame(null) },
+      h("span", { class: "fx-none", "aria-hidden": "true" }),
+      h("span", {}, "ไม่ใส่"),
     ),
     ...NAME_FRAMES.map((f) =>
       h(
         "button",
-        { type: "button", class: "name-frame", "data-name-frame": f.id, title: f.description, onclick: () => setNameFrame(f.id) },
-        f.icon && h("img", { src: f.icon, alt: "", width: 36, height: 36 }),
+        { type: "button", class: "fx", "data-name-frame": f.id, title: f.description, onclick: () => setNameFrame(f.id) },
+        f.icon ? h("img", { src: f.icon, alt: "", width: 36, height: 36 }) : h("span", { class: "fx-none", "aria-hidden": "true" }),
         h("span", {}, f.name),
       ),
     ),
