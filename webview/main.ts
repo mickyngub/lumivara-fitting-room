@@ -373,17 +373,23 @@ function onNameInput(event: Event): void {
 const FX_THUMB = { w: 27, h: 18 };
 let fxThumbs: { canvas: HTMLCanvasElement; effect: Effect }[] = [];
 
+// A row scrolled sideways keeps its place when its tiles are drawn again.
+function refill(id: string, tiles: HTMLElement[]): void {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const { scrollLeft } = row;
+  row.replaceChildren(...tiles);
+  row.scrollLeft = scrollLeft;
+}
+
 function renderBackgrounds(): void {
   const colours = THEMES.map((t) =>
-    h("button", {
-      type: "button",
-      class: "swatch",
-      title: t.name,
-      "aria-label": t.name,
-      "aria-pressed": String(t.id === backgroundId),
-      style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})`,
-      onclick: () => setBackground(t.id, true),
-    }),
+    h(
+      "button",
+      { type: "button", class: "fx", title: t.name, "aria-pressed": String(t.id === backgroundId), onclick: () => setBackground(t.id, true) },
+      h("span", { class: "fx-thumb", style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})` }),
+      h("span", {}, t.name),
+    ),
   );
   fxThumbs = [];
   const animated = EFFECTS.map((e) => {
@@ -396,10 +402,7 @@ function renderBackgrounds(): void {
       h("span", {}, e.name),
     );
   });
-  document.getElementById("backgrounds")?.replaceChildren(
-    h("div", { class: "swatches", role: "radiogroup", "aria-label": "สีพื้นหลัง" }, ...colours),
-    h("div", { class: "fx-row", role: "radiogroup", "aria-label": "พื้นหลังเคลื่อนไหว" }, ...animated),
-  );
+  refill("backgrounds", [...colours, ...animated]);
 }
 
 function animateFxThumbs(now: number): void {
@@ -451,7 +454,7 @@ function renderFrames(): void {
       h("span", {}, f.name),
     );
   });
-  document.getElementById("frames")?.replaceChildren(...tiles);
+  refill("frames", tiles);
   const style = frameById(frameId);
   const stage = document.querySelector<HTMLElement>(".stage");
   if (stage) stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.colours.mid}40`;
@@ -642,7 +645,7 @@ function buildLayout(): void {
     h("h2", {}, "กรอบชื่อ"),
     h("div", { id: "name-frames", class: "frames item-row", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(6, "fx")),
     h("h2", {}, "พื้นหลัง"),
-    h("div", { id: "backgrounds", class: "backgrounds" }),
+    h("div", { id: "backgrounds", class: "frames", role: "radiogroup", "aria-label": "พื้นหลัง" }),
     h("h2", {}, "กรอบการ์ด"),
     h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
     h("h2", {}, "อาชีพ"),

@@ -631,18 +631,6 @@ h2 {
     box-shadow: 0 0 0 2px var(--navy-deep), 0 0 12px rgba(201, 164, 92, 0.55);
 }
 
-.backgrounds {
-    display: grid;
-    gap: 8px;
-    margin: 4px 0 2px;
-}
-
-.fx-row {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-}
-
 .fx {
     position: relative;
     display: grid;
