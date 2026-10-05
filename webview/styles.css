@@ -16,6 +16,7 @@
     --serif: Georgia, "Times New Roman", "Noto Serif Thai", "Noto Sans Thai", serif;
     --sans: "Google Sans", "Noto Sans Thai", Tahoma, Arial, sans-serif;
     color-scheme: dark;
+    --panel-bg: radial-gradient(120% 45% at 50% -5%, #21407a 0%, var(--navy-deep) 55%, var(--navy-night) 100%);
 }
 
 * {
@@ -55,7 +56,7 @@ body {
     padding: 0 12px 20px;
     color: var(--parchment);
     font: 13px/1.45 var(--sans);
-    background: radial-gradient(120% 45% at 50% -5%, #21407a 0%, var(--navy-deep) 55%, var(--navy-night) 100%);
+    background: var(--panel-bg);
     background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
 }
@@ -114,10 +115,21 @@ button:disabled {
     color: var(--parchment);
 }
 
+/* The preview stays in view while the options scroll under it; the dock
+   shares the panel's fixed background, so it is seamless at the top. */
+.stage-dock {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    margin: 0 -12px;
+    padding: 8px 12px;
+    background: var(--panel-bg);
+    background-attachment: fixed;
+}
+
 .stage {
     position: relative;
-    width: 296px;
-    max-width: 100%;
+    width: 100%;
     margin: 0 auto;
     border-radius: 10px;
     overflow: hidden;
@@ -373,8 +385,9 @@ button:disabled {
 
 .drag-hint {
     position: absolute;
-    right: 20px;
-    top: 22px;
+    z-index: 2;
+    right: 14px;
+    top: 12px;
     color: var(--faint);
     font-size: 10.5px;
     pointer-events: none;
@@ -490,6 +503,7 @@ h2 {
 }
 
 .wing {
+    position: relative;
     display: grid;
     justify-items: center;
     align-content: center;
@@ -519,6 +533,59 @@ h2 {
 .wing[aria-pressed="true"] {
     border-color: var(--gold);
     box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
+}
+
+.wing-chip {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--parchment);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(8, 19, 43, 0.8);
+}
+
+.wing-chip[hidden],
+.wing-tray[hidden] {
+    display: none;
+}
+
+.wing-tray {
+    position: relative;
+    margin-top: 10px;
+    padding: 8px 8px 6px;
+    border: 1px solid var(--gold-dark);
+    border-radius: 12px;
+    background: #0d1a36;
+}
+
+.wing-tray::before {
+    content: "";
+    position: absolute;
+    top: -7px;
+    left: calc(var(--caret-x, 50%) - 6px);
+    width: 12px;
+    height: 12px;
+    border-top: 1px solid var(--gold-dark);
+    border-left: 1px solid var(--gold-dark);
+    background: #0d1a36;
+    transform: rotate(45deg);
+}
+
+.wing-tray-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 2px 4px;
+    color: var(--gold-light);
+    font: 600 12px/1.4 var(--serif);
+}
+
+.wing-tray .swatch {
+    width: 24px;
+    height: 24px;
 }
 
 .swatches {
@@ -686,19 +753,52 @@ h2 {
 }
 
 
-.status {
+.primary-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.primary.busy:disabled {
+    opacity: 1;
+    filter: saturate(0.7);
+}
+
+.primary.busy .primary-label::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(11, 26, 58, 0.3);
+    border-top-color: var(--navy-deep);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Over the button rather than above it in the flow, so an error moves nothing. */
+.place-error {
+    position: absolute;
+    right: 12px;
+    bottom: calc(100% - 8px);
+    left: 12px;
     margin: 0;
-    color: var(--mint);
+    padding: 6px 10px;
+    border: 1px solid var(--coral);
+    border-radius: 8px;
+    background: rgba(48, 14, 18, 0.95);
+    color: var(--coral);
     font-size: 12px;
     text-align: center;
 }
 
-.status:empty {
+.place-error[hidden] {
     display: none;
-}
-
-.status.error {
-    color: var(--coral);
 }
 
 @media (prefers-reduced-motion: reduce) {

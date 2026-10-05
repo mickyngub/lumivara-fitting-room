@@ -15,6 +15,7 @@ import { EFFECTS, type Effect } from "../src/art/effects";
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
+import { dyePixels, hexToHsl, mainColour } from "../src/art/dye";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
@@ -22,7 +23,10 @@ const EXPORT_SCALE = 4;
 const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 67 } };
 // As tall as the card's picture, with the feet at the same height, so a name frame has the card's room under them.
 const STAGE_NATIVE = { w: 118, h: EXPORT_NATIVE.h, feet: { x: 59, y: EXPORT_NATIVE.feet.y } };
-const STAGE_SCALE_CSS = 2.5;
+// The preview takes at most this share of the panel's height, so the options under it keep room.
+const STAGE_SHARE = 0.5;
+const POSES_H = 36;
+let stageScale = 2;
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
@@ -51,7 +55,9 @@ const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes
 let classId = "";
 let outfitId: string | null = null;
 let wingsId: string | null = null;
-let wingDye: string | null = null;
+// Each wing keeps the colour it was given.
+const wingDyes = new Map<string, string>();
+const wingDye = () => (wingsId ? (wingDyes.get(wingsId) ?? null) : null);
 const WING_DYES = [
   { hex: "#e5484d", name: "แดง" },
   { hex: "#3fbf6a", name: "เขียว" },
@@ -115,7 +121,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
   return {
     look: l,
     wings: wingsId,
-    dye: wingDye,
+    dye: wingDye(),
     accessory: accessoryId,
     pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
     wingMs: f.wingMs,
@@ -272,6 +278,7 @@ function renderChoices(): void {
   document
     .querySelectorAll<HTMLElement>("[data-name-frame]")
     .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.nameFrame || null) === nameFrameId)));
+  syncWingDyes();
   const current = poseOf(look()).id;
   document.getElementById("poses")!.replaceChildren(
     ...posesFor(look()).map((p) =>
@@ -320,7 +327,7 @@ function renderName(): void {
   const draw = ++plateDraw;
   void Promise.all([loadNameFont(lines), frame && nameFrameArt(frame).catch(() => undefined)]).then(([, art]) => {
     if (draw !== plateDraw) return;
-    const scale = STAGE_SCALE_CSS * devicePixelRatio;
+    const scale = stageScale * devicePixelRatio;
     canvas.width = Math.round(STAGE_NATIVE.w * scale);
     canvas.height = Math.round(STAGE_NATIVE.h * scale);
     drawNameplate(canvas.getContext("2d")!, lines, STAGE_NATIVE.feet, scale, STAGE_PLATE_ROOM, art);
@@ -447,17 +454,26 @@ async function frameOverlay(): Promise<ArrayBuffer | undefined> {
   return blob ? blob.arrayBuffer() : undefined;
 }
 
-function setStatus(text: string, error = false): void {
-  const node = document.getElementById("status")!;
-  node.textContent = text;
-  node.className = `status${error ? " error" : ""}`;
+const PLACE_LABEL = "✦ วางลงบอร์ด";
+const PLACED_MS = 1600;
+let placedTimer: ReturnType<typeof setTimeout> | undefined;
+
+// The button shows the whole placing state inside its own box, so nothing around it moves.
+function setPlacing(state: "idle" | "busy" | "placed"): void {
+  busy = state === "busy";
+  const button = document.querySelector<HTMLButtonElement>(".primary")!;
+  button.disabled = busy;
+  button.classList.toggle("busy", busy);
+  button.classList.toggle("placed", state === "placed");
+  button.querySelector(".primary-label")!.textContent = busy ? "กำลังวางลงบอร์ด…" : state === "placed" ? "✓ วางแล้ว" : PLACE_LABEL;
+  clearTimeout(placedTimer);
+  if (state === "placed") placedTimer = setTimeout(() => setPlacing("idle"), PLACED_MS);
 }
 
-function setBusy(next: boolean): void {
-  busy = next;
-  document
-    .querySelectorAll<HTMLButtonElement>(".actions button")
-    .forEach((b) => (b.disabled = next));
+function showPlaceError(message: string | null): void {
+  const node = document.getElementById("place-error")!;
+  node.textContent = message ?? "";
+  node.hidden = !message;
 }
 
 let logoImage: Promise<HTMLImageElement> | null = null;
@@ -508,8 +524,8 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
 
 async function placeLook(): Promise<void> {
   if (busy) return;
-  setBusy(true);
-  setStatus("กำลังวางลงบอร์ด…");
+  setPlacing("busy");
+  showPlaceError(null);
   try {
     const l = look();
     const { frames, loopMs } = await exportFrames(l);
@@ -517,8 +533,8 @@ async function placeLook(): Promise<void> {
     const card: CardPayload = { plate: background().plate, frames, loopMs, ...(frame ? { frame } : {}) };
     send({ type: "place", cards: [card] }, [...frames, ...(frame ? [frame] : [])]);
   } catch (err) {
-    setBusy(false);
-    setStatus(err instanceof Error ? err.message : String(err), true);
+    setPlacing("idle");
+    showPlaceError(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -529,23 +545,38 @@ function stageControls(turn: (delta: number) => void): HTMLElement[] {
   return [
     h("button", { type: "button", class: "turn left", "aria-label": "หมุนซ้าย", onclick: () => turn(1) }, "‹"),
     h("button", { type: "button", class: "turn right", "aria-label": "หมุนขวา", onclick: () => turn(-1) }, "›"),
-    h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
   ];
 }
 
 const skeletons = (n: number, className: string) => Array.from({ length: n }, () => h("div", { class: `${className} skeleton`, "aria-hidden": "true" }));
 
+// Whole and half steps keep every game pixel the same size on a 2x screen.
+const fitStageScale = () =>
+  Math.max(1, Math.floor(Math.min(root.clientWidth / STAGE_NATIVE.w, (innerHeight * STAGE_SHARE - POSES_H) / STAGE_NATIVE.h) * 2) / 2);
+
+function fitStage(): void {
+  stageScale = fitStageScale();
+  const size = { width: `${STAGE_NATIVE.w * stageScale}px`, height: `${STAGE_NATIVE.h * stageScale}px` };
+  const frame = document.getElementById("stage-frame");
+  if (frame) Object.assign(frame.style, size);
+  if (live?.canvas) Object.assign(live.canvas.style, size);
+  renderName();
+}
+
 /** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
 function buildLayout(): void {
+  stageScale = fitStageScale();
   const plate = h("canvas", { id: "nameplate", class: "nameplate", "aria-hidden": "true" });
   const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
   loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
   const canvasFrame = h(
     "div",
-    { id: "stage-frame", class: "stage-frame", style: `width:${STAGE_NATIVE.w * STAGE_SCALE_CSS}px;height:${STAGE_NATIVE.h * STAGE_SCALE_CSS}px` },
+    { id: "stage-frame", class: "stage-frame", style: `width:${STAGE_NATIVE.w * stageScale}px;height:${STAGE_NATIVE.h * stageScale}px` },
     loadingBox,
     plate,
     frameArt,
+    // In the picture's corner at any size of the preview.
+    h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
   );
   const host = h("div", { id: "stage-host", role: "img", "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน" }, canvasFrame);
   const turn = (delta: number) => {
@@ -556,9 +587,13 @@ function buildLayout(): void {
     brand(),
     h(
       "div",
-      { class: "stage loading" },
-      h("div", { class: "stage-view" }, host, ...stageControls(turn)),
-      h("div", { id: "poses", class: "poses", role: "radiogroup", "aria-label": "ท่าทาง" }),
+      { class: "stage-dock" },
+      h(
+        "div",
+        { class: "stage loading" },
+        h("div", { class: "stage-view" }, host, ...stageControls(turn)),
+        h("div", { id: "poses", class: "poses", role: "radiogroup", "aria-label": "ท่าทาง" }),
+      ),
     ),
     h(
       "label",
@@ -586,15 +621,19 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
-    h("h2", {}, "สีปีก ", customNote()),
-    h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
+    h(
+      "div",
+      { id: "wing-tray", class: "wing-tray", hidden: true },
+      h("p", { class: "wing-tray-head" }, h("span", { id: "wing-tray-title" }), customNote()),
+      h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
+    ),
     h("h2", {}, "เครื่องประดับ ", customNote()),
     h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ" }),
     h(
       "div",
       { class: "actions" },
-      h("button", { type: "button", class: "primary", disabled: true, onclick: () => void placeLook() }, "✦ วางลงบอร์ด"),
-      h("p", { id: "status", class: "status", role: "status" }),
+      h("p", { id: "place-error", class: "place-error", role: "alert", hidden: true }),
+      h("button", { type: "button", class: "primary", disabled: true, onclick: () => void placeLook() }, h("span", { class: "primary-label", role: "status" }, PLACE_LABEL)),
     ),
     h("div", { id: "exporter", class: "exporter", "aria-hidden": "true" }),
   );
@@ -679,8 +718,7 @@ function startStage(): void {
   live = liveStage;
   liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);
   void liveStage.ready.then(() => {
-    liveStage.canvas.style.width = `${STAGE_NATIVE.w * STAGE_SCALE_CSS}px`;
-    liveStage.canvas.style.height = `${STAGE_NATIVE.h * STAGE_SCALE_CSS}px`;
+    fitStage();
     // One more frame so the character is drawn before the loading cover lifts.
     requestAnimationFrame(() => {
       document.querySelector(".stage")?.classList.remove("loading");
@@ -722,10 +760,55 @@ function renderWings(): void {
             renderChoices();
           },
         },
-        w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36 }),
+        w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
         h("span", {}, w.name),
+        h("i", { class: "wing-chip", "aria-hidden": "true", hidden: true }),
       ),
     ),
+  );
+}
+
+const iconDyes = new Map<string, Promise<string>>();
+
+function dyedIcon(url: string, hex: string): Promise<string> {
+  const key = `${url}~${hex}`;
+  let made = iconDyes.get(key);
+  if (!made) {
+    made = loadImage(url).then((image) => {
+      const canvas = h("canvas", { width: image.naturalWidth, height: image.naturalHeight });
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      dyePixels(data.data, mainColour(data.data), hexToHsl(hex));
+      ctx.putImageData(data, 0, 0);
+      return canvas.toDataURL();
+    });
+    made.catch(() => iconDyes.delete(key));
+    iconDyes.set(key, made);
+  }
+  return made;
+}
+
+function paintWingTile(tile: HTMLElement): void {
+  const id = tile.dataset.wings;
+  const dye = id ? wingDyes.get(id) : undefined;
+  const chip = tile.querySelector<HTMLElement>(".wing-chip");
+  if (chip) {
+    chip.hidden = !dye;
+    chip.style.background = dye ?? "";
+  }
+  const img = tile.querySelector<HTMLImageElement>("img[data-icon]");
+  if (!img) return;
+  const icon = img.dataset.icon!;
+  if (!dye) {
+    img.src = icon;
+    return;
+  }
+  void dyedIcon(icon, dye).then(
+    (src) => {
+      if (wingDyes.get(id!) === dye) img.src = src;
+    },
+    () => {},
   );
 }
 
@@ -745,17 +828,29 @@ function renderWingDyes(): void {
   syncWingDyes();
 }
 
+/** Puts each wing's colour on its tile, and the chosen wing's on the swatches and the tray pointing at it. */
 function syncWingDyes(): void {
-  const custom = wingDye !== null && !WING_DYES.some((d) => d.hex === wingDye);
+  const dye = wingDye();
+  const custom = dye !== null && !WING_DYES.some((d) => d.hex === dye);
   document.querySelectorAll<HTMLElement>("[data-dye]").forEach((n) => {
-    const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === wingDye;
+    const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === dye;
     n.setAttribute("aria-pressed", String(pressed));
-    if (n.dataset.dye === "custom") n.style.background = custom ? wingDye! : "";
+    if (n.dataset.dye === "custom") n.style.background = custom ? dye! : "";
   });
+  document.querySelectorAll<HTMLElement>("[data-wings]").forEach(paintWingTile);
+  const tray = document.getElementById("wing-tray");
+  if (!tray) return;
+  tray.hidden = !wingsId;
+  const tile = wingsId ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`) : null;
+  if (!tile) return;
+  tray.style.setProperty("--caret-x", `${tile.offsetLeft + tile.offsetWidth / 2 - tray.offsetLeft}px`);
+  document.getElementById("wing-tray-title")!.textContent = `สีของ ${WINGS.find((w) => w.id === wingsId)?.name ?? "ปีก"}`;
 }
 
 function setWingDye(hex: string | null): void {
-  wingDye = hex;
+  if (!wingsId) return;
+  if (hex) wingDyes.set(wingsId, hex);
+  else wingDyes.delete(wingsId);
   syncWingDyes();
 }
 
@@ -875,14 +970,17 @@ api.onMessage((raw) => {
       renderName();
     }
   } else if (message.type === "placed") {
-    setBusy(false);
-    setStatus("");
+    setPlacing("placed");
   } else if (message.type === "error") {
-    setBusy(false);
-    setStatus(message.message, true);
+    setPlacing("idle");
+    showPlaceError(message.message);
   }
 });
 
 buildLayout();
+addEventListener("resize", () => {
+  fitStage();
+  syncWingDyes();
+});
 send({ type: "ready" });
 void load();
