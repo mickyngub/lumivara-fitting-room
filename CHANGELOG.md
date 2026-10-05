@@ -3,6 +3,7 @@
 ## 1.4.0
 
 - ปีกเพิ่ม 10 แบบ: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon และ Clockwork Wings ขยับ เปลี่ยนสี และมีแสงแบบปีกในเกม · 10 more wings: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon and Clockwork Wings, flapping, dyeable and glowing like the game's
+- กรอบการ์ดเพิ่ม 10 แบบ: ซากุระ น้ำแข็ง เพลิง นีออน ดวงดาว สายรุ้ง ป่า ทะเล กะโหลก และสายฟ้า · 10 more card frames: sakura, frost, inferno, neon, celestial, rainbow, forest, ocean, skull and thunder
 
 ## 1.3.3
 

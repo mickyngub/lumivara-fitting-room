@@ -13,7 +13,7 @@
 5. ใส่เครื่องประดับได้ 1 ชิ้นจาก 14 แบบ เช่น วงแหวนนางฟ้า มงกุฎ หูแมว หมวกแม่มด หูกระต่าย โบว์ หรือหูฟัง แล้วเปลี่ยนสีได้เหมือนปีก
 6. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
 7. เลือกกรอบชื่อจาก Item Mall ชื่อของคุณจะอยู่ในกรอบแบบเดียวกับในเกม
-8. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้ 15 แบบ เช่น ออโรร่า ซากุระ หิมะ ลาวา ใต้น้ำ และทุ่งหญ้า) และกรอบการ์ด
+8. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้ 15 แบบ เช่น ออโรร่า ซากุระ หิมะ ลาวา ใต้น้ำ และทุ่งหญ้า) และกรอบการ์ด 16 แบบ เช่น ซากุระ น้ำแข็ง นีออน ดวงดาว และสายฟ้า
 9. กด ✦ วางลงบอร์ด การ์ดจะขยับวนได้เหมือนในเกม วางได้หลายใบ แล้วกด “แชร์” เพื่อส่งลิงก์ให้เพื่อน
 
 ชื่อ พื้นหลัง กรอบการ์ด และปีกจากรูปของคุณทุกแบบจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร ปีก และกรอบชื่อโหลดสดจาก lumivaraonline.com ทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
@@ -29,7 +29,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 5. Add one of 14 accessories, from a halo and cat ears to a witch hat, bunny ears, a bow or headphones, in its own colour or one you pick.
 6. Type your in-game name: it shows under the character with your class, like the game's name tag.
 7. Pick a name frame from the Item Mall: your name sits in it the way the game draws it.
-8. Pick a background (a colour or one of 15 animated pixel-art scenes) and a card frame, then tap ✦ วางลงบอร์ด.
+8. Pick a background (a colour or one of 15 animated pixel-art scenes) and one of 16 card frames, from sakura and frost to neon, celestial and thunder, then tap ✦ วางลงบอร์ด.
 
 ## Permissions
 
