@@ -20,21 +20,21 @@ import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const EXPORT_SCALE = 4;
-const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 67 } };
+const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 70 } };
 // The preview takes at most this share of the panel's height, so the options under it keep room.
 const STAGE_SHARE = 0.5;
 const POSES_H = 36;
 const MIN_STAGE_W = 118;
-const STAGE_H = EXPORT_NATIVE.h;
+const STAGE_H = 102;
 const panelWidth = () => document.getElementById("root")!.clientWidth;
 // Whole and half steps keep every game pixel the same size on a 2x screen.
 const fitStageScale = (stageW: number) =>
   Math.max(1, Math.floor(Math.min(panelWidth() / stageW, (innerHeight * STAGE_SHARE - POSES_H) / STAGE_H) * 2) / 2);
 let stageScale = fitStageScale(MIN_STAGE_W);
-// As tall as the card's picture with the feet at the same height, so a name frame has the
-// card's room under them, and as wide as the panel holds at the preview's scale, so it fills it.
+// Room under the feet for a name frame and the class, like the card's, and as wide as the
+// panel holds at the preview's scale, so the picture fills it.
 const STAGE_W = Math.floor(panelWidth() / stageScale / 2) * 2;
-const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: EXPORT_NATIVE.feet.y } };
+const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: 67 } };
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };

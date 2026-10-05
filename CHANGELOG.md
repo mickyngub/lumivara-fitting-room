@@ -6,6 +6,7 @@
 - ตัวอย่างตัวละครอยู่ด้านบนตลอด เลื่อนเลือกของด้านล่างได้โดยไม่หายไป · the preview stays in view while you scroll through the options
 - สีปีกอยู่ที่ปีกที่เลือก ปีกแต่ละแบบจำสีของตัวเอง · each wing carries and remembers its own colour, chosen right under it
 - ปุ่มวางลงบอร์ดแสดงสถานะในตัวปุ่ม ไม่มีข้อความดันหน้าจอ · the place button shows its progress itself, so nothing on the panel moves
+- การ์ดบนบอร์ดกว้างขึ้น 8 px และสูงขึ้น 24 px ตัวละครยังอยู่กลางภาพ · the placed card is 8 px wider and 24 px taller (424 × 480), with the character still centred
 - เครื่องประดับ: วงแหวนนางฟ้า มงกุฎ หูแมว เขาปีศาจ และมงกุฎดอกไม้ อยู่บนหัวทุกท่าและทุกทิศ · accessories: a halo, crown, cat ears, devil horns and a flower crown that stay on the head in every pose and direction
 
 ## 1.1.0
