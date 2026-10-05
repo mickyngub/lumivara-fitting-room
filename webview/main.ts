@@ -21,12 +21,20 @@ import { THEMES, type Theme } from "./themes";
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const EXPORT_SCALE = 4;
 const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 67 } };
-// As tall as the card's picture, with the feet at the same height, so a name frame has the card's room under them.
-const STAGE_NATIVE = { w: 118, h: EXPORT_NATIVE.h, feet: { x: 59, y: EXPORT_NATIVE.feet.y } };
 // The preview takes at most this share of the panel's height, so the options under it keep room.
 const STAGE_SHARE = 0.5;
 const POSES_H = 36;
-let stageScale = 2;
+const MIN_STAGE_W = 118;
+const STAGE_H = EXPORT_NATIVE.h;
+const panelWidth = () => document.getElementById("root")!.clientWidth;
+// Whole and half steps keep every game pixel the same size on a 2x screen.
+const fitStageScale = (stageW: number) =>
+  Math.max(1, Math.floor(Math.min(panelWidth() / stageW, (innerHeight * STAGE_SHARE - POSES_H) / STAGE_H) * 2) / 2);
+let stageScale = fitStageScale(MIN_STAGE_W);
+// As tall as the card's picture with the feet at the same height, so a name frame has the
+// card's room under them, and as wide as the panel holds at the preview's scale, so it fills it.
+const STAGE_W = Math.floor(panelWidth() / stageScale / 2) * 2;
+const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: EXPORT_NATIVE.feet.y } };
 const AUTO_TURN_MS = 1400;
 const DRAG_STEP_PX = 26;
 const THUMB_ROW = { anim: "idle", dir: "south" };
@@ -550,12 +558,8 @@ function stageControls(turn: (delta: number) => void): HTMLElement[] {
 
 const skeletons = (n: number, className: string) => Array.from({ length: n }, () => h("div", { class: `${className} skeleton`, "aria-hidden": "true" }));
 
-// Whole and half steps keep every game pixel the same size on a 2x screen.
-const fitStageScale = () =>
-  Math.max(1, Math.floor(Math.min(root.clientWidth / STAGE_NATIVE.w, (innerHeight * STAGE_SHARE - POSES_H) / STAGE_NATIVE.h) * 2) / 2);
-
 function fitStage(): void {
-  stageScale = fitStageScale();
+  stageScale = fitStageScale(STAGE_NATIVE.w);
   const size = { width: `${STAGE_NATIVE.w * stageScale}px`, height: `${STAGE_NATIVE.h * stageScale}px` };
   const frame = document.getElementById("stage-frame");
   if (frame) Object.assign(frame.style, size);
@@ -565,7 +569,6 @@ function fitStage(): void {
 
 /** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
 function buildLayout(): void {
-  stageScale = fitStageScale();
   const plate = h("canvas", { id: "nameplate", class: "nameplate", "aria-hidden": "true" });
   const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
   loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
@@ -584,7 +587,6 @@ function buildLayout(): void {
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
   root.replaceChildren(
-    brand(),
     h(
       "div",
       { class: "stage-dock" },
@@ -931,8 +933,6 @@ function renderNameFrames(): void {
     ),
   );
 }
-
-const brand = () => h("header", { class: "brand" }, h("span", {}, "LUMIVARA"), h("h1", {}, "ห้องแต่งตัว"));
 
 async function load(): Promise<void> {
   showLoading({ done: 0, total: 0 });
