@@ -414,7 +414,7 @@ function renderBackgrounds(): void {
       h("span", {}, e.name),
     );
   });
-  refill("backgrounds", [...colours, ...animated]);
+  refill("backgrounds", [...animated, ...colours]);
 }
 
 function animateFxThumbs(now: number): void {
