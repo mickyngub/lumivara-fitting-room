@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
 import { test } from "node:test";
-import { buildCards, CARD, FRAME, frameAnimation, LOGO } from "../src/card";
+import { buildCards, CARD, FRAME, LOGO } from "../src/card";
+import { apng, crc32, pngChunks } from "../src/art/apng";
 import { layoutNameplate, nameplate, slicePieces, type NameplateLine, type Rect } from "../webview/nametag";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
@@ -16,9 +18,6 @@ import { dyePixels, dyeRgb, hexToHsl, hslToRgb, mainColour, rgbToHsl } from "../
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { findHeads } from "../src/game/head";
 
-const maxKeyframes = 32;
-const idleFrames = 15;
-const walkFrames = 8;
 const phaserBlendModes = { BlendModes: { NORMAL: 0, ADD: 1 } };
 const neutralFarTint = 0xb8b8b8;
 const cosmetics: Cosmetics = JSON.parse(readFileSync(new URL("./fixtures/cosmetics.json", import.meta.url), "utf8"));
@@ -236,18 +235,52 @@ test("the game's own wing code runs outside the game and places every wing part 
   }
 });
 
-test("each frame of a card's animation is opaque only during its own two steps", () => {
-  for (const frames of [walkFrames, idleFrames]) {
-    for (let frame = 0; frame < frames; frame++) {
-      const opacity = frameAnimation(frame, frames, 1000).animation.transform
-        .opacity!;
-      assert.ok(opacity.length <= maxKeyframes);
-      assert.deepEqual(
-        opacity.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
-        [frame * 2 + 1],
-      );
-    }
+// A width×height PNG filled with one RGBA colour, as a canvas would encode it.
+const solidPng = (width: number, height: number, rgba: number[]) => {
+  const chunk = (type: string, data: Uint8Array) => {
+    const body = new Uint8Array([...Buffer.from(type, "latin1"), ...data]);
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    out.set(body, 4);
+    out.writeUInt32BE(crc32(body), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const rows = Buffer.concat(Array.from({ length: height }, () => Buffer.from([0, ...Array.from({ length: width }, () => rgba).flat()])));
+  return new Uint8Array(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(rows)), chunk("IEND", new Uint8Array(0))]));
+};
+
+test("frames become one animated PNG that loops for ever, each shown for the same time, numbered in order", () => {
+  const frames = [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]].map((c) => ({ png: solidPng(4, 3, c), x: 0, y: 0 }));
+  const out = apng(frames, { num: 900, den: 3000 });
+  const chunks = pngChunks(out);
+  assert.deepEqual(chunks.map((c) => c.type), ["IHDR", "acTL", "fcTL", "IDAT", "fcTL", "fdAT", "fcTL", "fdAT", "IEND"]);
+  const u32 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint32(at);
+  const u16 = (d: Uint8Array, at: number) => new DataView(d.buffer, d.byteOffset).getUint16(at);
+  const acTL = chunks[1].data;
+  assert.deepEqual([u32(acTL, 0), u32(acTL, 4)], [3, 0], "not 3 frames looping for ever");
+  const numbered = chunks.filter((c) => c.type === "fcTL" || c.type === "fdAT").map((c) => u32(c.data, 0));
+  assert.deepEqual(numbered, [0, 1, 2, 3, 4], "sequence numbers are not 0, 1, 2…");
+  for (const control of chunks.filter((c) => c.type === "fcTL")) {
+    assert.deepEqual([u32(control.data, 4), u32(control.data, 8), u16(control.data, 20), u16(control.data, 22)], [4, 3, 900, 3000]);
   }
+  const view = new DataView(out.buffer);
+  for (let at = 8; at < out.length; ) {
+    const length = view.getUint32(at);
+    assert.equal(view.getUint32(at + 8 + length), crc32(out.subarray(at + 4, at + 8 + length)), "a chunk's CRC is wrong");
+    at += 12 + length;
+  }
+});
+
+test("a frame in another pixel format or outside the image is refused rather than written broken", () => {
+  const rgba = solidPng(4, 4, [1, 2, 3, 255]);
+  const rgb = new Uint8Array(rgba);
+  rgb[8 + 8 + 9] = 2;
+  assert.throws(() => apng([{ png: rgba, x: 0, y: 0 }, { png: rgb, x: 0, y: 0 }], { num: 1, den: 10 }), /pixel format/);
+  assert.throws(() => apng([{ png: rgba, x: 0, y: 0 }, { png: solidPng(2, 2, [0, 0, 0, 255]), x: 3, y: 3 }], { num: 1, den: 10 }), /leaves the image/);
 });
 
 test("a typed character name is trimmed, single-spaced and capped at the game's 20 characters", () => {
@@ -257,15 +290,16 @@ test("a typed character name is trimmed, single-spaced and capped at the game's 
   assert.equal(cleanName("   "), "");
 });
 
-test("a card is its frame and the animated picture, no text, with the Drawdy symbol in the picture's bottom-right corner", () => {
+test("a card is one board element showing its animated image, with the Drawdy symbol in the picture's bottom-right corner", () => {
   let seq = 0;
-  const generateIdInSequence = () => String(seq++);
-  const { elements } = buildCards([{ frames: [new ArrayBuffer(1), new ArrayBuffer(1)], loopMs: 1, frame: new ArrayBuffer(1) }], { x: 0, y: 0 }, generateIdInSequence);
-  type Box = { type: string; x: number; y: number; width: number; height: number; text?: string };
-  const boxes = elements as unknown as Box[];
-  assert.equal(boxes.filter((e) => e.text).length, 0, "the card has a text label");
-  assert.ok(boxes.some((e) => e.type === "image" && e.x === 0 && e.y === 0 && e.width === CARD.w && e.height === CARD.h), "frame overlay covers the card");
-  assert.equal(boxes.filter((e) => e.type === "image" && e.x === CARD.pad && e.y === CARD.pad && e.width === FRAME.w && e.height === FRAME.h).length, 2);
+  const elements = buildCards([{ image: "data:image/png;base64,AAAA" }, { image: "data:image/png;base64,BBBB" }], { x: 10, y: 20 }, () => String(seq++));
+  assert.equal(elements.length, 2, "a card is more than one element");
+  const [first, second] = elements as unknown as { type: string; x: number; y: number; width: number; height: number; groupId?: string; schema: { type: string; child: string; styles: Record<string, unknown> } }[];
+  assert.deepEqual([first.type, first.x, first.y, first.width, first.height], ["component", 10, 20, CARD.w, CARD.h]);
+  assert.deepEqual([first.schema.type, first.schema.child], ["image", "data:image/png;base64,AAAA"]);
+  assert.equal(first.schema.styles.pointerEvents, "none", "the image would take the board's pointer");
+  assert.equal(first.groupId, undefined);
+  assert.equal(second.x, 10 + CARD.w + CARD.gap);
   assert.equal(CARD.w - FRAME.w, 2 * CARD.pad);
   assert.equal(CARD.h - FRAME.h, 2 * CARD.pad, "the picture does not fill the frame");
   assert.ok(LOGO.h >= 16, "the symbol is under the logo pack's 16 px minimum");
@@ -464,7 +498,6 @@ test("an action pose plays every frame of the move once per card loop, then stan
   );
   const next = poseAt(attack, look, "south", attack.loopMs);
   assert.deepEqual([next.anim, next.frame, next.wingMs], [shots[0].anim, shots[0].frame, shots[0].wingMs], "the loop has a seam");
-  for (const pose of POSES) assert.ok(pose.cardFrames * 2 + 1 <= maxKeyframes, `${pose.id} card needs more keyframes than Drawdy allows`);
 });
 
 test("cast is offered only to sprites that have it, and sitting holds the last sit frame", () => {

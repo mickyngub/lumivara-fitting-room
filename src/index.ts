@@ -126,25 +126,13 @@ async function saveProfile(change: Partial<Profile>): Promise<void> {
 async function place(cards: CardPayload[]): Promise<void> {
   const width = cards.length * CARD.w + (cards.length - 1) * CARD.gap;
   const origin = await freeSpot(width, CARD.h);
-  const { elements, animations } = buildCards(cards, origin, generateId);
+  const elements = buildCards(cards, origin, generateId);
   const added = await send({
     type: "command:scene:add-drawdy-elements",
     req: { elements },
   });
   if (added.res.error)
     throw new Error(added.res.error.message ?? added.res.error.type);
-  if (animations.length) {
-    // One update call starts every frame's clock together, so a lineup walks in step.
-    await send({
-      type: "command:scene:update-drawdy-elements",
-      req: {
-        updates: animations.map(({ id, animation }) => ({
-          drawdyElementId: id,
-          properties: { localAnimation: animation },
-        })),
-      },
-    });
-  }
   await send({
     type: "command:camera:fly-to-rect",
     req: {

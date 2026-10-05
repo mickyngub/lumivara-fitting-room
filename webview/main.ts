@@ -1,11 +1,8 @@
-import { FRAME, LOGO } from "../src/card";
+import { CARD, FRAME, LOGO, PLATE } from "../src/card";
+import { apng, type ApngFrame } from "../src/art/apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, NameFrame, WingInfo } from "../src/game/types";
-import type {
-  CardPayload,
-  DriverToWebview,
-  WebviewToDriver,
-} from "../src/messages";
+import type { DriverToWebview, WebviewToDriver } from "../src/messages";
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameplate, loadNameFont, nameplate, type NameFrameArt, type Rect } from "./nametag";
 import { loadCatalog, loadImage, type Catalog } from "./live";
@@ -457,11 +454,6 @@ function drawStageFrame(): void {
   canvas.getContext("2d")!.putImageData(new ImageData(px.data, w, h), 0, 0);
 }
 
-async function frameOverlay(): Promise<ArrayBuffer | undefined> {
-  const blob = await new Promise<Blob | null>((resolve) => frameCanvas(FRAME_GRID.scale).toBlob(resolve, "image/png"));
-  return blob ? blob.arrayBuffer() : undefined;
-}
-
 const PLACE_LABEL = "✦ วางลงบอร์ด";
 const PLACED_MS = 1600;
 let placedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -493,7 +485,22 @@ const drawdyLogo = () =>
     return image;
   })());
 
-async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: number }> {
+async function pngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("ทำภาพการ์ดไม่สำเร็จ");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+/** Every frame of the pose as the whole card, plate, frame and picture, in one animated PNG. */
+async function exportCard(l: Look): Promise<string> {
   exporter ??= new Stage({
     parent: document.getElementById("exporter")!,
     width: EXPORT_NATIVE.w,
@@ -511,23 +518,28 @@ async function exportFrames(l: Look): Promise<{ frames: ArrayBuffer[]; loopMs: n
   const frame = nameFrame();
   const art = frame ? await nameFrameArt(frame) : undefined;
   const logo = await drawdyLogo();
-  const frames: ArrayBuffer[] = [];
+  const overlay = frameCanvas(FRAME_GRID.scale);
+  const frames: ApngFrame[] = [];
   for (let k = 0; k < cardFrames; k++) {
     const shot = await exporter.capture(sceneAt(l, direction, (k * loopMs) / cardFrames));
-    const canvas = document.createElement("canvas");
-    canvas.width = FRAME.w;
-    canvas.height = FRAME.h;
-    const ctx = canvas.getContext("2d")!;
+    const card = h("canvas", { width: CARD.w, height: CARD.h });
+    const ctx = card.getContext("2d")!;
+    ctx.fillStyle = background().plate;
+    ctx.beginPath();
+    ctx.roundRect(PLATE.inset, PLATE.inset, CARD.w - PLATE.inset * 2, CARD.h - PLATE.inset * 2, PLATE.radius);
+    ctx.fill();
     ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(overlay, 0, 0);
+    ctx.translate(CARD.pad, CARD.pad);
     ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
     drawNameplate(ctx, lines, EXPORT_NATIVE.feet, EXPORT_SCALE, CARD_PLATE_ROOM, art);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (blob) frames.push(await blob.arrayBuffer());
+    frames.push({ png: await pngBytes(card), x: 0, y: 0 });
   }
-  return { frames, loopMs };
+  const image = apng(frames, { num: Math.round(loopMs), den: cardFrames * 1000 });
+  return dataUrl(new Blob([image], { type: "image/png" }));
 }
 
 async function placeLook(): Promise<void> {
@@ -535,11 +547,7 @@ async function placeLook(): Promise<void> {
   setPlacing("busy");
   showPlaceError(null);
   try {
-    const l = look();
-    const { frames, loopMs } = await exportFrames(l);
-    const frame = await frameOverlay();
-    const card: CardPayload = { plate: background().plate, frames, loopMs, ...(frame ? { frame } : {}) };
-    send({ type: "place", cards: [card] }, [...frames, ...(frame ? [frame] : [])]);
+    send({ type: "place", cards: [{ image: await exportCard(look()) }] });
   } catch (err) {
     setPlacing("idle");
     showPlaceError(err instanceof Error ? err.message : String(err));

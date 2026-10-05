@@ -1,8 +1,6 @@
 export type CardPayload = {
-  plate?: string;
-  frame?: ArrayBuffer;
-  frames: ArrayBuffer[];
-  loopMs: number;
+  /** The whole card as an animated PNG data URL. */
+  image: string;
 };
 
 export type WebviewToDriver =
