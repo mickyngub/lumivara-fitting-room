@@ -1,17 +1,23 @@
+import { zlibSync } from "fflate";
+
 /**
  * Animated PNG from whole RGBA frames, the format a browser plays by itself in
- * an <img>. Every frame shares one palette of at most 256 colours, a later
- * frame keeps only the region that changed, and a frame like the one before
- * shows that one longer instead, which together keep a card a few times
+ * an <img>. Every frame shares one palette of at most 128 colours, a later
+ * frame keeps only the region that changed with the pixels in it that did not
+ * change left clear and laid over the frame before, and a frame like the one
+ * before shows that one longer instead, which together keep a card many times
  * smaller than whole true-colour frames.
  */
 export type Chunk = { type: string; data: Uint8Array };
 
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
-const MAX_COLOURS = 256;
+const MAX_COLOURS = 128;
 // Alpha counts this much more than a colour channel when a colour is brought to
 // the nearest in the palette, so soft edges keep their shape.
 const ALPHA_WEIGHT = 3;
+// The palette's first entry is always fully clear, for the corners and for the
+// unchanged pixels of a frame laid over the one before.
+const CLEAR = 0;
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -75,9 +81,10 @@ const channel = (colour: number, c: number) => (colour >>> (24 - 8 * c)) & 255;
 type Swatch = { colour: number; count: number };
 
 /**
- * At most 256 colours for all the frames: every colour when there are that few,
- * otherwise median cut weighted by how many pixels each colour covers, each box
- * standing for its most common colour so flat pixel art keeps its exact colours.
+ * At most 128 colours for all the frames, clear first: every colour when there
+ * are that few, otherwise median cut weighted by how many pixels each colour
+ * covers, each box standing for its most common colour so flat pixel art keeps
+ * its exact colours.
  */
 export function paletteOf(frames: Uint8ClampedArray[]): number[] {
   const counts = new Map<number, number>();
@@ -87,9 +94,8 @@ export function paletteOf(frames: Uint8ClampedArray[]): number[] {
       counts.set(c, (counts.get(c) ?? 0) + 1);
     }
   }
-  const clear = counts.has(0);
-  counts.delete(0);
-  const room = MAX_COLOURS - (clear ? 1 : 0);
+  counts.delete(CLEAR);
+  const room = MAX_COLOURS - 1;
   const swatches: Swatch[] = [...counts].map(([colour, count]) => ({
     colour,
     count,
@@ -100,7 +106,7 @@ export function paletteOf(frames: Uint8ClampedArray[]): number[] {
       : medianCut(swatches, room).map(
           (box) => box.reduce((a, b) => (b.count > a.count ? b : a)).colour,
         );
-  return clear ? [0, ...kept] : kept;
+  return [CLEAR, ...kept];
 }
 
 function medianCut(swatches: Swatch[], boxes: number): Swatch[][] {
@@ -161,13 +167,6 @@ function indexer(palette: number[]): (colour: number) => number {
   };
 }
 
-async function zlib(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
-  const stream = new Blob([data])
-    .stream()
-    .pipeThrough(new CompressionStream("deflate"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
 type Region = { x: number; y: number; w: number; h: number };
 
 /** The box around the pixels that differ between two frames of palette indices, or null when none do. */
@@ -192,12 +191,42 @@ function changed(
     : { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
 }
 
-// Rows of palette indices, each after PNG's "no filter" byte, which suits palette images best.
-function rows(
-  indices: Uint8Array,
+type Shown = {
+  region: Region;
+  rows: Uint8Array;
+  over: boolean;
+  frames: number;
+};
+
+/**
+ * A later frame's rows: every pixel that did not change is left clear and the
+ * frame is laid over the one before, so long clear runs compress to almost
+ * nothing; a frame where a pixel turns less than opaque replaces its region instead.
+ */
+function laterFrame(
+  before: Uint8Array,
+  now: Uint8Array,
   width: number,
   r: Region,
-): Uint8Array<ArrayBuffer> {
+  opaque: boolean[],
+): Shown {
+  const rows = new Uint8Array(r.h * (r.w + 1));
+  let over = true;
+  for (let y = 0; y < r.h; y++) {
+    for (let x = 0; x < r.w; x++) {
+      const p = (r.y + y) * width + r.x + x;
+      const changes = now[p] !== before[p];
+      if (changes && !opaque[now[p]]) over = false;
+      rows[y * (r.w + 1) + 1 + x] = changes ? now[p] : CLEAR;
+    }
+  }
+  if (!over)
+    return { region: r, rows: wholeRows(now, width, r), over, frames: 1 };
+  return { region: r, rows, over, frames: 1 };
+}
+
+// Rows of palette indices, each after PNG's "no filter" byte, which suits palette images best.
+function wholeRows(indices: Uint8Array, width: number, r: Region): Uint8Array {
   const out = new Uint8Array(r.h * (r.w + 1));
   for (let y = 0; y < r.h; y++) {
     const from = (r.y + y) * width + r.x;
@@ -207,31 +236,39 @@ function rows(
 }
 
 /** Loops the frames for ever, each shown for delay.num / delay.den seconds. */
-export async function apng(
+export function apng(
   frames: Uint8ClampedArray[],
   size: { w: number; h: number },
   delay: { num: number; den: number },
-): Promise<Uint8Array<ArrayBuffer>> {
+): Uint8Array<ArrayBuffer> {
   if (!frames.length) throw new Error("no frames");
   const { w, h } = size;
   if (frames.some((f) => f.length !== w * h * 4))
     throw new Error("a frame is not the image's size");
   const palette = paletteOf(frames);
+  const opaque = palette.map((c) => channel(c, 3) === 255);
   const indexOf = indexer(palette);
   const indexed = frames.map((d) => {
     const out = new Uint8Array(w * h);
     for (let p = 0; p < out.length; p++) out[p] = indexOf(colourAt(d, p * 4));
     return out;
   });
-  const shown: { region: Region; indices: Uint8Array; frames: number }[] = [
-    { region: { x: 0, y: 0, w, h }, indices: indexed[0], frames: 1 },
+  const whole = { x: 0, y: 0, w, h };
+  const shown: Shown[] = [
+    {
+      region: whole,
+      rows: wholeRows(indexed[0], w, whole),
+      over: false,
+      frames: 1,
+    },
   ];
   for (let i = 1; i < indexed.length; i++) {
     const region = changed(indexed[i - 1], indexed[i], w, h);
-    if (region) shown.push({ region, indices: indexed[i], frames: 1 });
+    if (region)
+      shown.push(laterFrame(indexed[i - 1], indexed[i], w, region, opaque));
     else shown[shown.length - 1].frames++;
   }
-  const lastOpaque = palette.reduce(
+  const lastClear = palette.reduce(
     (last, c, i) => (channel(c, 3) < 255 ? i : last),
     -1,
   );
@@ -247,16 +284,10 @@ export async function apng(
         palette.flatMap((c) => [channel(c, 0), channel(c, 1), channel(c, 2)]),
       ),
     ),
-    ...(lastOpaque >= 0
-      ? [
-          chunk(
-            "tRNS",
-            new Uint8Array(
-              palette.slice(0, lastOpaque + 1).map((c) => channel(c, 3)),
-            ),
-          ),
-        ]
-      : []),
+    chunk(
+      "tRNS",
+      new Uint8Array(palette.slice(0, lastClear + 1).map((c) => channel(c, 3))),
+    ),
     chunk("acTL", bytes([shown.length, 4], [0, 4])),
   ];
   let sequence = 0;
@@ -274,11 +305,11 @@ export async function apng(
           [delay.num * frame.frames, 2],
           [delay.den, 2],
           [0, 1],
-          [0, 1],
+          [frame.over ? 1 : 0, 1],
         ),
       ),
     );
-    const data = await zlib(rows(frame.indices, w, frame.region));
+    const data = zlibSync(frame.rows, { level: 9 });
     if (i === 0) parts.push(chunk("IDAT", data));
     else {
       const body = new Uint8Array(4 + data.length);

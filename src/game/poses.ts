@@ -8,9 +8,11 @@ export const FLAP_PERIOD_MS = {
 // The game's player steps idle frames every 180 ms and walk frames every 90 ms.
 const IDLE_FRAME_MS = 180;
 const WALK_FRAME_MS = 90;
-// A card frame owns two keyframes of its opacity track and Drawdy allows 32,
-// so a card loop has at most 15 frames.
+// An action is timed in this many steps per loop.
 const ACTION_STEPS = 15;
+// A placed card shows about half the frames the preview does, which halves
+// what it takes on the board; the preview keeps every step.
+const CARD_FRAMES = { still: 8, walk: 4, action: 8 };
 
 export type PoseId = "idle" | "walk" | "attack" | "attack-alt" | "cast" | "sit";
 export type PoseDef = {
@@ -33,21 +35,21 @@ export const POSES: PoseDef[] = [
     id: "idle",
     name: "ยืน",
     loopMs: FLAP_PERIOD_MS.idle,
-    cardFrames: 15,
+    cardFrames: CARD_FRAMES.still,
     walking: false,
   },
   {
     id: "walk",
     name: "เดิน",
     loopMs: FLAP_PERIOD_MS.walk,
-    cardFrames: 8,
+    cardFrames: CARD_FRAMES.walk,
     walking: true,
   },
   {
     id: "attack",
     name: "โจมตี",
     loopMs: FLAP_PERIOD_MS.walk,
-    cardFrames: ACTION_STEPS,
+    cardFrames: CARD_FRAMES.action,
     walking: false,
     needs: "attack",
   },
@@ -55,7 +57,7 @@ export const POSES: PoseDef[] = [
     id: "attack-alt",
     name: "โจมตี 2",
     loopMs: FLAP_PERIOD_MS.walk,
-    cardFrames: ACTION_STEPS,
+    cardFrames: CARD_FRAMES.action,
     walking: false,
     needs: "attack-alt",
   },
@@ -63,7 +65,7 @@ export const POSES: PoseDef[] = [
     id: "cast",
     name: "ร่ายเวท",
     loopMs: FLAP_PERIOD_MS.walk,
-    cardFrames: ACTION_STEPS,
+    cardFrames: CARD_FRAMES.action,
     walking: false,
     needs: "cast",
   },
@@ -71,7 +73,7 @@ export const POSES: PoseDef[] = [
     id: "sit",
     name: "นั่ง",
     loopMs: FLAP_PERIOD_MS.idle,
-    cardFrames: 15,
+    cardFrames: CARD_FRAMES.still,
     walking: false,
     needs: "sit",
   },

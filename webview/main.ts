@@ -1,5 +1,5 @@
 import { CARD, FRAME, LOGO, PLATE } from "../src/card";
-import { apng } from "../src/art/apng";
+import { apng } from "./apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, NameFrame, WingInfo } from "../src/game/types";
 import { MAX_OWN_WINGS, type DriverToWebview, type SavedWing, type WebviewToDriver } from "../src/messages";
@@ -577,7 +577,7 @@ async function exportCard(l: Look): Promise<string> {
     ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
     frames.push(ctx.getImageData(0, 0, CARD.w, CARD.h).data);
   }
-  const image = await apng(frames, { w: CARD.w, h: CARD.h }, { num: Math.round(loopMs), den: cardFrames * 1000 });
+  const image = apng(frames, { w: CARD.w, h: CARD.h }, { num: Math.round(loopMs), den: cardFrames * 1000 });
   return dataUrl(new Blob([image], { type: "image/png" }));
 }
 

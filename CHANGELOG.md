@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3
+
+- การ์ดบนบอร์ดเล็กลงอีกราว 3 เท่า เหลือราว 20 ถึง 50 KB ต่อใบ: ใช้ 128 สี เก็บเฉพาะจุดที่เปลี่ยน บีบอัดแน่นขึ้น และใช้ภาพราวครึ่งหนึ่งของตัวอย่าง ท่าบนการ์ดจึงขยับเป็นจังหวะห่างขึ้นเล็กน้อย · placed cards take about 3 times less room again, about 20 to 50 KB each: 128 colours, only the pixels that change, tighter compression and about half the preview's frames, so the motion on a card is a little choppier
+
 ## 1.3.2
 
 - การ์ดบนบอร์ดเล็กลง 4 ถึง 7 เท่า เหลือราว 50 ถึง 160 KB ต่อใบ หน้าตาเหมือนเดิม · placed cards take 4 to 7 times less room on the board, about 50 to 160 KB each, and look the same

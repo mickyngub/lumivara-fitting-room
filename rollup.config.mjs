@@ -1,3 +1,4 @@
+import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -37,7 +38,8 @@ export default [
     {
         input: "webview/main.ts",
         output: { file: "dist/webview.js", format: "iife" },
-        plugins: [typescript(), terser(), webviewHtml()],
+        // The panel bundles what it imports, such as fflate's deflate for the cards.
+        plugins: [nodeResolve({ browser: true }), typescript(), terser(), webviewHtml()],
     },
     {
         input: "src/index.ts",
