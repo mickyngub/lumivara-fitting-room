@@ -34,6 +34,12 @@ let stageScale = fitStageScale(MIN_STAGE_W);
 const STAGE_W = Math.floor(panelWidth() / stageScale / 2) * 2;
 const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: 67 } };
 const DRAG_STEP_PX = 26;
+// The preview's engine has this long to start once the catalog is in, and placing a card
+// this long to get its own engine ready, before the panel says so and offers a retry.
+const STAGE_BOOT_MS = 20000;
+const CARD_STAGE_MS = 20000;
+// An error while the engine boots fails the boot only if the engine is still not up this much later.
+const BOOT_ERROR_GRACE_MS = 2000;
 const THUMB_ROW = { anim: "idle", dir: "south" };
 const SAVE_NAME_MS = 400;
 // The nameplate shrinks to stay this far inside the picture: the stage's
@@ -546,6 +552,7 @@ async function exportCard(l: Look): Promise<string> {
     wingTextures: catalog.wingTextures,
     backdrop: cardBackdrop(background()),
   });
+  await withTimeout(exporter.ready, CARD_STAGE_MS, "ทำภาพการ์ดไม่ทัน ลองวางอีกครั้ง");
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const own = isUploadId(wingsId) ? ownWings.get(wingsId) : undefined;
   if (own) await exporter.useWing(own.id, own.style);
@@ -587,10 +594,23 @@ async function placeLook(): Promise<void> {
   try {
     send({ type: "place", cards: [{ image: await exportCard(look()) }] });
   } catch (err) {
+    // A card engine that failed is built again on the next try.
+    exporter?.destroy();
+    exporter = null;
     setPlacing("idle");
-    showPlaceError(err instanceof Error ? err.message : String(err));
+    showPlaceError(errorText(err));
   }
 }
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+// The engine's own words, after a hint a player can act on when the browser would not give it graphics.
+const bootErrorText = (err: unknown) => {
+  const text = errorText(err);
+  return /webgl/i.test(text) ? `เบราว์เซอร์เปิดกราฟิกให้ไม่ได้ ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วกดลองอีกครั้ง (${text})` : text;
+};
+
+const withTimeout = <T>(work: Promise<T>, ms: number, message: string): Promise<T> =>
+  Promise.race([work, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
 
 let loadingBox: HTMLElement | null = null;
 let loadingArtFrame = 0;
@@ -714,7 +734,7 @@ function buildLayout(): void {
 }
 
 /** While the catalog loads, the preview shows the chosen background at its real size with progress over it. */
-function showLoading(progress: { done: number; total: number } | { error: string }): void {
+function showLoading(progress: { done: number; total: number } | { error: string; title?: string }): void {
   if (!loadingBox) return;
   let art = loadingBox.querySelector<HTMLCanvasElement>("canvas");
   if (!art) {
@@ -731,7 +751,7 @@ function showLoading(progress: { done: number; total: number } | { error: string
       ? h(
           "div",
           { class: "stage-loading-panel" },
-          h("p", { class: "stage-loading-title" }, "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
+          h("p", { class: "stage-loading-title" }, progress.title ?? "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
           h("p", { class: "stage-loading-detail" }, progress.error),
           h("button", { type: "button", class: "retry", onclick: () => void load() }, "ลองอีกครั้ง"),
         )
@@ -760,9 +780,33 @@ function startStage(): void {
   });
   live = liveStage;
   liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);
+  let up = false;
+  const fail = (reason: unknown) => {
+    if (up || live !== liveStage) return;
+    stopWatching();
+    showLoading({ error: bootErrorText(reason), title: "เปิดตัวอย่างตัวละครไม่ได้" });
+  };
+  const onError = (e: ErrorEvent) => setTimeout(() => fail(e.error ?? e.message), BOOT_ERROR_GRACE_MS);
+  const onRejection = (e: PromiseRejectionEvent) => setTimeout(() => fail(e.reason), BOOT_ERROR_GRACE_MS);
+  const watchdog = setTimeout(() => fail(`ตัวอย่างไม่ขึ้นภายใน ${STAGE_BOOT_MS / 1000} วินาที ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วลองอีกครั้ง`), STAGE_BOOT_MS);
+  function stopWatching(): void {
+    clearTimeout(watchdog);
+    removeEventListener("error", onError);
+    removeEventListener("unhandledrejection", onRejection);
+  }
+  addEventListener("error", onError);
+  addEventListener("unhandledrejection", onRejection);
   void liveStage.ready.then(() => {
-    fitStage();
-    syncLookDyes();
+    if (live !== liveStage) return;
+    up = true;
+    stopWatching();
+    // Neither may keep the cover down: the preview works without them.
+    try {
+      fitStage();
+      syncLookDyes();
+    } catch (err) {
+      console.error(err);
+    }
     // One more frame so the character is drawn before the loading cover lifts.
     requestAnimationFrame(() => {
       document.querySelector(".stage")?.classList.remove("loading");
@@ -865,7 +909,6 @@ function dropWing(event: DragEvent, id: string | null): void {
   void takeWingFile(event.dataTransfer?.files[0], id);
 }
 
-const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 async function takeWingFile(file: File | undefined, id: string | null): Promise<void> {
   if (!file || !live) return;
@@ -1246,14 +1289,31 @@ function renderNameFrames(): void {
   );
 }
 
+/** Clears a preview that failed to start, so a retry begins from a clean stage. */
+function resetStages(): void {
+  live?.destroy();
+  exporter?.destroy();
+  live = null;
+  exporter = null;
+}
+
 async function load(): Promise<void> {
+  resetStages();
   showLoading({ done: 0, total: 0 });
   try {
     catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) => showLoading({ done, total }));
   } catch (err) {
-    showLoading({ error: err instanceof Error ? err.message : String(err) });
+    showLoading({ error: errorText(err) });
     return;
   }
+  try {
+    openRoom();
+  } catch (err) {
+    showLoading({ error: bootErrorText(err), title: "เปิดห้องแต่งตัวไม่ได้" });
+  }
+}
+
+function openRoom(): void {
   const own = drawnWings();
   useWingStyles({ ...catalog.styles, ...Object.fromEntries(own.map((w) => [w.id, w.style])) });
   Object.assign(catalog.wingTextures, ...own.map((w) => w.textures));
@@ -1265,10 +1325,9 @@ async function load(): Promise<void> {
   outfitId = OUTFITS[0]?.id ?? null;
   wingsId = WINGS[0]?.id ?? null;
   startStage();
-  if (pendingWings) {
-    restoreWings(pendingWings);
-    pendingWings = null;
-  }
+  const wings = pendingWings ?? (savedWings.length ? savedWings : null);
+  pendingWings = null;
+  if (wings) restoreWings(wings);
   renderWings();
   renderNameFrames();
   renderPickers();

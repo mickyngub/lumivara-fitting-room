@@ -70,6 +70,21 @@ export type StageOptions = {
 
 const png = (b64: string) => `data:image/png;base64,${b64}`;
 
+function webGLAvailable(): boolean {
+  const gl = document.createElement("canvas").getContext("webgl") as WebGLRenderingContext | null;
+  gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  return !!gl;
+}
+
+// Phaser checks for WebGL once, when it loads, so a check that failed then would fail every
+// retry; the game looks again just before it boots.
+class StageGame extends Phaser.Game {
+  boot(): void {
+    if (!this.device.features.webGL) this.device.features.webGL = webGLAvailable();
+    super.boot();
+  }
+}
+
 /**
  * Draws characters with the game's own engine (Phaser 3.90, as the game ships)
  * at native game resolution, with the game's pixelArt and roundPixels
@@ -171,7 +186,7 @@ export class Stage {
       }
     }
 
-    this.game = new Phaser.Game({
+    this.game = new StageGame({
       type: Phaser.WEBGL,
       parent: options.parent,
       width,
@@ -218,6 +233,11 @@ export class Stage {
       if (!this.textures.exists(style.texture)) this.textures.addImage(style.texture, image);
     }
     kit.config[id] = style;
+  }
+
+  /** Stops the engine and removes its canvas, so a stage that failed to start can be built again. */
+  destroy(): void {
+    this.game.destroy(true);
   }
 
   /** Phaser creates its canvas while booting, so this is set once ready resolves. */

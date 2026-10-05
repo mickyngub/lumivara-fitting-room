@@ -31,13 +31,24 @@ async function fetchOk(url: string): Promise<Response> {
   return res;
 }
 
+/** Loads an image, giving up after the same wait as a fetch so a stalled download cannot hang the panel. */
 export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const where = url.startsWith("data:") ? "image" : new URL(url).pathname;
+    const timer = setTimeout(() => {
+      img.src = "";
+      reject(new Error(`${where}: image timed out`));
+    }, FETCH_TIMEOUT_MS);
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () =>
-      reject(new Error(`${new URL(url).pathname}: image failed`));
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error(`${where}: image failed`));
+    };
     img.src = url;
   });
 }
