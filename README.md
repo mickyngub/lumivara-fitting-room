@@ -9,7 +9,7 @@
 1. ติดตั้งแล้วห้องแต่งตัวจะเปิดขึ้นเอง ครั้งต่อไปกดไอคอน Lumivara ที่แถบด้านขวาของบอร์ด
 2. รอโหลดชุดจากเกมสักครู่ แล้วลากที่ตัวละครหรือกดลูกศรเพื่อหมุนดูรอบตัว
 3. เลือกอาชีพ แล้วเลือกชุดปกติหรือชุดแฟชั่นของอาชีพนั้น (ชุดแฟชั่นใส่ได้เฉพาะอาชีพที่ชุดนั้นรองรับ เหมือนในเกม)
-4. เลือกปีก และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
+4. เลือกปีกและสีปีก (7 สี หรือเลือกสีเอง) และเลือกท่าใต้ตัวอย่าง: ยืน เดิน โจมตี โจมตี 2 นั่ง (จอมเวทร่ายเวทได้ด้วย)
 5. พิมพ์ชื่อในเกม ชื่อจะขึ้นใต้ตัวละครพร้อมอาชีพ เหมือนป้ายชื่อในเกม
 6. เลือกกรอบชื่อจาก Item Mall ชื่อของคุณจะอยู่ในกรอบแบบเดียวกับในเกม
 7. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้: ออโรร่า ห้วงดาว วงเวท ประกายไฟ ซากุระ) และกรอบการ์ด
@@ -23,7 +23,7 @@ Try every Lumivara Online outfit, wing and name frame on your own character befo
 
 1. After installing, the Fitting Room opens on its own; next time, open it from the Lumivara button on the right of the board.
 2. Drag the character or use the arrows to turn it around.
-3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it), then wings.
+3. Pick a class, then its plain look or one of its fashion outfits (an outfit fits only the classes the game lets wear it), then wings and their colour: one of 7 or any colour you pick.
 4. Pick a pose: idle, walk, attack, attack 2 or sit (mages can also cast).
 5. Type your in-game name: it shows under the character with your class, like the game's name tag.
 6. Pick a name frame from the Item Mall: your name sits in it the way the game draws it.
@@ -44,6 +44,7 @@ The extension sends nothing anywhere. It only downloads the game's public fashio
 - Nothing about the fashion is bundled. Each time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits, wings and name frames with names, icons, art paths and wing placement) and builds each look's sprite sheet in the browser from the game's own atlases: idle, walk and every action pose the atlas has, in all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs. If the game cannot be reached the panel says so and offers a retry.
 - Characters are drawn with the game's own engine, Phaser 3.90, at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scaled up, so they match the game pixel for pixel.
 - Wings move with the game's own wing code (`src/game/wings.js`, lifted from the game client by `scripts/wing-code.mjs`); placement comes from `cosmetics.json`.
+- A wing colour recolours the wing art in the browser (`src/art/dye.ts`): every colour turns the way the wing's main colour turns onto the chosen one, in hue, saturation and lightness, and dark outlines keep their lightness. The game's wing code still animates the dyed wing, and its glow, sparkles and swirls are turned the same way.
 - Name frames are drawn the way the game's stylesheet draws them: a border-image around the padded name label, corners as drawn and the middle stretched to the name, with the gem strip centred over the seam. The art comes from `cosmetics.json`; the slice numbers come from the game's stylesheet (`src/game/name-frames.ts`, lifted by `scripts/name-frames.mjs`), so a frame the game adds later shows up once they are lifted again. The preview and the card draw the name tag with the same code, and shrink it to fit the picture when a wide frame and a long name need it.
 - A card is a frame overlay plus up to 15 picture frames that Drawdy plays in a loop. The background, name tag and Drawdy mark are baked into every frame, so a still render shows one clean pose. Animated backgrounds and frames are pixel art on the sprites' 4x grid (`src/art/`) and loop without a seam.
 

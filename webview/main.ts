@@ -50,6 +50,17 @@ const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes
 let classId = "";
 let outfitId: string | null = null;
 let wingsId: string | null = null;
+let wingDye: string | null = null;
+const WING_DYES = [
+  { hex: "#e5484d", name: "แดง" },
+  { hex: "#3fbf6a", name: "เขียว" },
+  { hex: "#38b6f2", name: "ฟ้า" },
+  { hex: "#9b5cf6", name: "ม่วง" },
+  { hex: "#f472b6", name: "ชมพู" },
+  { hex: "#f2f2f2", name: "ขาว" },
+  { hex: "#2b2b36", name: "ดำ" },
+];
+const CUSTOM_DYE = "#7ec8ff";
 let nameFrameId: string | null = null;
 const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
 type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
@@ -102,6 +113,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
   return {
     look: l,
     wings: wingsId,
+    dye: wingDye,
     pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
     wingMs: f.wingMs,
     loop: f.loop,
@@ -571,6 +583,8 @@ function buildLayout(): void {
     h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
     h("h2", {}, "ปีก"),
     h("div", { id: "wings", class: "wings", role: "radiogroup", "aria-label": "ปีก" }, ...skeletons(4, "wing")),
+    h("h2", {}, "สีปีก"),
+    h("div", { id: "wing-dyes", class: "swatches", role: "radiogroup", "aria-label": "สีปีก" }),
     h(
       "div",
       { class: "actions" },
@@ -601,6 +615,7 @@ function buildLayout(): void {
   renderName();
   renderBackgrounds();
   renderFrames();
+  renderWingDyes();
   requestAnimationFrame(animateFxThumbs);
 }
 
@@ -706,6 +721,36 @@ function renderWings(): void {
       ),
     ),
   );
+}
+
+// Built once: re-rendering would close the colour picker while it is being dragged.
+function renderWingDyes(): void {
+  document.getElementById("wing-dyes")!.replaceChildren(
+    h("button", { type: "button", class: "swatch swatch-none", title: "สีเดิม", "aria-label": "สีเดิม", "data-dye": "", onclick: () => setWingDye(null) }),
+    ...WING_DYES.map((d) =>
+      h("button", { type: "button", class: "swatch", title: d.name, "aria-label": d.name, "data-dye": d.hex, style: `background:${d.hex}`, onclick: () => setWingDye(d.hex) }),
+    ),
+    h(
+      "label",
+      { class: "swatch swatch-custom", title: "เลือกสีเอง", "data-dye": "custom" },
+      h("input", { type: "color", value: CUSTOM_DYE, "aria-label": "เลือกสีเอง", oninput: (e: Event) => setWingDye((e.target as HTMLInputElement).value) }),
+    ),
+  );
+  syncWingDyes();
+}
+
+function syncWingDyes(): void {
+  const custom = wingDye !== null && !WING_DYES.some((d) => d.hex === wingDye);
+  document.querySelectorAll<HTMLElement>("[data-dye]").forEach((n) => {
+    const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === wingDye;
+    n.setAttribute("aria-pressed", String(pressed));
+    if (n.dataset.dye === "custom") n.style.background = custom ? wingDye! : "";
+  });
+}
+
+function setWingDye(hex: string | null): void {
+  wingDye = hex;
+  syncWingDyes();
 }
 
 function setNameFrame(id: string | null): void {

@@ -1,6 +1,7 @@
 /// <reference types="phaser" />
 import { createWingKit } from "../src/game/wings.js";
 import { FLAP_PERIOD_MS } from "../src/game/poses";
+import { dyePixels, dyeRgb, hexToHsl, mainColour, type Hsl } from "../src/art/dye";
 import type { Look, WingStyle } from "../src/game/types";
 
 const FEET_OFFSET = 9;
@@ -29,6 +30,8 @@ export type Pose = { direction: string; anim: string; frame: number; walking: bo
 export type Scene = {
   look: Look;
   wings: string | null;
+  /** A colour to dye the wings, or none for the game's own. */
+  dye?: string | null;
   pose: Pose;
   wingMs: number;
   loop: BackdropTime;
@@ -71,6 +74,8 @@ export class Stage {
   private entity!: Record<string, any>;
   private readonly clock = { now: 0 };
   private wingsId: string | null = null;
+  private dye: string | null = null;
+  private readonly mainColours = new Map<string, Hsl>();
   private override: Scene | null = null;
   private readonly game: Phaser.Game;
 
@@ -195,20 +200,7 @@ export class Stage {
     if (!byDirection) {
       byDirection = new Map();
       const { cell, rows, baseline } = look.sheet;
-      const source = this.textures
-        .get(look.id)
-        .getSourceImage() as HTMLImageElement;
-      const canvas = document.createElement("canvas");
-      canvas.width = source.width;
-      canvas.height = source.height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(source, 0, 0);
-      const { data, width } = ctx.getImageData(
-        0,
-        0,
-        source.width,
-        source.height,
-      );
+      const { data, width } = this.sourcePixels(look.id).image;
       rows.forEach((row, r) => {
         if (row.anim !== "idle") return;
         let min = cell.w;
@@ -235,12 +227,73 @@ export class Stage {
     return byDirection.get(direction) ?? 0;
   }
 
+  private sourcePixels(key: string): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; image: ImageData } {
+    const source = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(source, 0, 0);
+    return { canvas, ctx, image: ctx.getImageData(0, 0, source.width, source.height) };
+  }
+
+  private mainColourOf(key: string): Hsl {
+    let colour = this.mainColours.get(key);
+    if (!colour) this.mainColours.set(key, (colour = mainColour(this.sourcePixels(key).image.data)));
+    return colour;
+  }
+
+  private dyedTexture(key: string, dye: string, main: Hsl): string {
+    const dyed = `${key}~${dye}`;
+    if (!this.textures.exists(dyed)) {
+      const { canvas, ctx, image } = this.sourcePixels(key);
+      dyePixels(image.data, main, hexToHsl(dye));
+      ctx.putImageData(image, 0, 0);
+      this.textures.addCanvas(dyed, canvas);
+    }
+    return dyed;
+  }
+
+  /** Registers a dyed copy of a wing style with the game's wing code: recoloured textures and far-wing tint. */
+  private dyedWings(id: string, dye: string): string {
+    const style = kit.config[id];
+    if (!style || !this.textures.exists(style.texture)) return id;
+    const main = this.mainColourOf(style.texture);
+    const texture = this.dyedTexture(style.texture, dye, main);
+    const rim = style.rim && this.textures.exists(style.rim) ? this.dyedTexture(style.rim, dye, main) : style.rim;
+    const key = `${id}~${dye}`;
+    kit.config[key] ??= {
+      ...style,
+      texture,
+      ...(rim ? { rim } : {}),
+      ...(style.far === undefined ? {} : { far: dyeRgb(style.far, main, hexToHsl(dye), true) }),
+    };
+    return key;
+  }
+
+  // The wing code colours its glow, motes and swirls from constants per aura,
+  // so they are read back off the parts it made and turned like the textures.
+  private dyeWingParts(id: string, dye: string): void {
+    const parts = this.entity.wings;
+    const style = kit.config[id];
+    if (!parts || !style) return;
+    const main = this.mainColourOf(style.texture);
+    const target = hexToHsl(dye);
+    for (const side of [parts.left, parts.right]) side[0].setTintFill(dyeRgb(side[0].tintTopLeft, main, target));
+    for (const mote of parts.motes) mote.setFillStyle(dyeRgb(mote.fillColor, main, target), mote.fillAlpha);
+    for (const swirl of parts.swirls) swirl.setTexture(this.dyedTexture(swirl.texture.key, dye, main));
+  }
+
   private apply(scene: Scene): void {
     const { look, pose } = scene;
     const { feet } = this.options;
-    if (scene.wings !== this.wingsId) {
-      this.entity.setWings(scene.wings ?? undefined);
+    const dye = scene.dye ?? null;
+    if (scene.wings !== this.wingsId || dye !== this.dye) {
+      const id = scene.wings && dye ? this.dyedWings(scene.wings, dye) : scene.wings;
+      this.entity.setWings(id ?? undefined);
+      if (scene.wings && dye && id !== scene.wings) this.dyeWingParts(scene.wings, dye);
       this.wingsId = scene.wings;
+      this.dye = dye;
     }
     this.clock.now = scene.wingMs;
     this.entity.wasWalking = pose.walking;

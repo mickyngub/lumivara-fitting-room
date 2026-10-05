@@ -12,6 +12,7 @@ import { cleanName, NAME_MAX } from "../src/name";
 import { EFFECTS } from "../src/art/effects";
 import { FRAME_GRID, FRAME_STYLES, paintFrame } from "../src/art/frames";
 import { pixels } from "../src/art/pixels";
+import { dyePixels, dyeRgb, hexToHsl, hslToRgb, mainColour, rgbToHsl } from "../src/art/dye";
 
 const maxKeyframes = 32;
 const idleFrames = 15;
@@ -337,6 +338,60 @@ test("a name frame's nine parts tile its image and its area, corners unstretched
   for (const p of [pieces[0], pieces[2], pieces[6], pieces[8]]) assert.deepEqual([p.dw, p.dh], [p.sw, p.sh], "a corner is stretched");
   assert.deepEqual([pieces[4].dx, pieces[4].dy, pieces[4].dw, pieces[4].dh], [box.x, box.y, box.w, box.h]);
   assert.deepEqual([pieces[4].sx, pieces[4].sw, pieces[4].sh], [l, image.w - l - r, image.h - t - b]);
+});
+
+test("colours convert to hsl and back", () => {
+  const colours: [number, number, number][] = [[255, 196, 51], [24, 32, 29], [255, 255, 255], [0, 0, 0], [56, 182, 242], [155, 92, 246]];
+  for (const rgb of colours) {
+    const back = hslToRgb(rgbToHsl(...rgb));
+    back.forEach((v, i) => assert.ok(Math.abs(v - rgb[i]) <= 1, `${rgb} came back as ${back}`));
+  }
+});
+
+// Three gold shades, a dark outline pixel and a transparent one.
+const goldWing = () => new Uint8ClampedArray([255, 214, 90, 255, 235, 170, 40, 255, 180, 120, 20, 255, 24, 20, 12, 255, 255, 0, 0, 0]);
+const hslAt = (data: Uint8ClampedArray, pixel: number) => rgbToHsl(data[pixel * 4], data[pixel * 4 + 1], data[pixel * 4 + 2]);
+
+test("a dye turns an item's main colour onto the chosen one, keeping its shading, outline and transparency", () => {
+  const data = goldWing();
+  const outline = hslAt(data, 3);
+  const target = hexToHsl("#38b6f2");
+  dyePixels(data, mainColour(data), target);
+  assert.ok(Math.abs(mainColour(data).h - target.h) < 3, `main hue is ${mainColour(data).h}, not ${target.h}`);
+  const [light, mid, dark] = [0, 1, 2].map((i) => hslAt(data, i).l);
+  assert.ok(light > mid && mid > dark, "the shading changed order");
+  near(hslAt(data, 3).l, outline.l, "the outline's lightness");
+  assert.deepEqual([...data.slice(16)], [255, 0, 0, 0], "a transparent pixel was touched");
+});
+
+test("dyeing an item to its own main colour leaves it as it is", () => {
+  const data = goldWing();
+  const before = [...data];
+  const main = mainColour(data);
+  dyePixels(data, main, main);
+  data.forEach((v, i) => assert.ok(Math.abs(v - before[i]) <= 1, `byte ${i} moved from ${before[i]} to ${v}`));
+});
+
+test("white and black dyes give silver and dark wings that keep their outline", () => {
+  for (const [hex, lighter] of [["#f2f2f2", true], ["#2b2b36", false]] as const) {
+    const data = goldWing();
+    const body = hslAt(data, 1);
+    const outline = hslAt(data, 3);
+    dyePixels(data, mainColour(data), hexToHsl(hex));
+    const dyed = hslAt(data, 1);
+    assert.ok(lighter ? dyed.l > body.l : dyed.l < body.l, `${hex} moved the body from ${body.l} to ${dyed.l}`);
+    assert.ok(dyed.s < 0.3, `${hex} left the body saturated at ${dyed.s}`);
+    near(hslAt(data, 3).l, outline.l, `${hex} outline lightness`);
+  }
+});
+
+test("a dyed tint can keep its lightness, so the far wing stays as shaded", () => {
+  const main = hexToHsl("#ebaa28");
+  const far = 0xc8a878;
+  const dyed = dyeRgb(far, main, hexToHsl("#38b6f2"), true);
+  const [before, after] = [far, dyed].map((c) => rgbToHsl((c >> 16) & 255, (c >> 8) & 255, c & 255));
+  assert.ok(Math.abs(after.l - before.l) < 0.01, `far lightness went from ${before.l} to ${after.l}`);
+  assert.ok(Math.abs(after.h - 199) < 5, `far hue is ${after.h}`);
 });
 
 test("an action pose plays every frame of the move once per card loop, then stands until the loop closes", () => {

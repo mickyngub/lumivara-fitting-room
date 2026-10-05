@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+
+- สีปีก: ย้อมปีกได้ 7 สี หรือเลือกสีเอง ทั้งแสง ประกาย และควันของปีกเปลี่ยนสีตาม · wing colours: 7 dyes or any colour you pick, with the wings' glow, sparkles and swirls dyed to match
+
 ## 1.1.0
 
 - กรอบชื่อ 10 แบบจาก Item Mall ชื่อของคุณอยู่ในกรอบแบบเดียวกับในเกม ทั้งในตัวอย่างและบนการ์ด · the Item Mall's 10 name frames, drawn around your name the way the game draws them, in the preview and on the card
