@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+- ปีกเพิ่ม 10 แบบ: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon และ Clockwork Wings ขยับ เปลี่ยนสี และมีแสงแบบปีกในเกม · 10 more wings: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon and Clockwork Wings, flapping, dyeable and glowing like the game's
+
 ## 1.3.3
 
 - การ์ดบนบอร์ดเล็กลงอีกราว 3 เท่า เหลือราว 20 ถึง 50 KB ต่อใบ: ใช้ 128 สี เก็บเฉพาะจุดที่เปลี่ยน บีบอัดแน่นขึ้น และใช้ภาพราวครึ่งหนึ่งของตัวอย่าง ท่าบนการ์ดจึงขยับเป็นจังหวะห่างขึ้นเล็กน้อย · placed cards take about 3 times less room again, about 20 to 50 KB each: 128 colours, only the pixels that change, tighter compression and about half the preview's frames, so the motion on a card is a little choppier
