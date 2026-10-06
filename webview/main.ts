@@ -3,6 +3,7 @@ import { apng } from "./apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, Mount, NameFrame, WingInfo } from "../src/game/types";
 import { MAX_OWN_WINGS, type DriverToWebview, type SavedWing, type WebviewToDriver } from "../src/messages";
+import { drawnMounts } from "./own-mounts";
 import { drawnWings, isUploadId, newUploadId, readWing, uploadedWing, WING_AURAS, WING_SIZES, type OwnWing } from "./own-wings";
 import { cleanName, NAME_MAX } from "../src/name";
 import { drawNameplate, loadNameFont, nameplate, type NameFrameArt, type Rect } from "./nametag";
@@ -906,7 +907,8 @@ function renderMounts(): void {
       h(
         "button",
         { type: "button", class: "wing", "data-mount": m.id, title: m.description, onclick: () => void setMount(m.id) },
-        m.icon && h("img", { src: m.icon, alt: "", width: 36, height: 36 }),
+        // A drawn mount's tile is its whole first frame, smoothed down to the tile.
+        m.icon && h("img", { src: m.icon, alt: "", width: 36, height: 36, class: m.icon.startsWith("data:") ? "smooth" : undefined }),
         h("span", {}, m.name),
       ),
     ),
@@ -1387,7 +1389,7 @@ function openRoom(): void {
   OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
   WINGS = [...catalog.wings, ...own.map((w) => w.info)];
   NAME_FRAMES = catalog.nameFrames;
-  MOUNTS = catalog.mounts;
+  MOUNTS = [...catalog.mounts, ...drawnMounts()];
   mountId = mountPicked = null;
   classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
   outfitId = OUTFITS[0]?.id ?? null;
