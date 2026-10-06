@@ -22,10 +22,10 @@ const HEADING: Record<string, Xy> = {
   north: [0, 1],
 };
 const ORIGIN: Record<string, Xy> = {
-  south: [62, 66],
-  "south-east": [64, 65],
-  east: [70, 67],
-  "north-east": [62, 66],
+  south: [62, 65],
+  "south-east": [66, 63],
+  east: [67, 66],
+  "north-east": [65, 65],
   north: [62, 66],
 };
 const NUDGE: Record<string, Xy> = {
@@ -38,6 +38,8 @@ const NUDGE: Record<string, Xy> = {
 /**
  * Each direction's wing beat: the middle of the stroke and half its sweep in
  * degrees above level, and how far ahead in the stroke its first frame starts.
+ * Seen from the side the far forewing rises right behind the seat, so the east
+ * row starts where no frame catches it lying level on the saddle.
  */
 const BEAT: Record<string, Vec> = {
   south: [6, 18, 0],
@@ -75,7 +77,10 @@ const PART = {
   trim: 5,
   eye: 6,
   feeler: 7,
+  foreLeft: 8,
+  hindLeft: 9,
 } as const;
+const LEFT = PART.foreLeft - PART.fore;
 const OUTLINE: Rgb[] = [
   LINE,
   LINE,
@@ -85,6 +90,8 @@ const OUTLINE: Rgb[] = [
   LINE,
   LINE,
   LINE,
+  WING_LINE,
+  WING_LINE,
 ];
 
 const LIGHT: Vec = (() => {
@@ -328,6 +335,9 @@ const CURL = 0.22;
 const HINGE = { x: 9, z: 4 };
 const BEND = 0.9;
 
+// The seat's column must show nothing above the back but the back itself, so
+// the forewing leaves a notch over the hinge's middle and the tails flare out
+// to the sides instead of trailing behind the seat.
 const FORE = wingOf(
   PART.fore,
   0.88,
@@ -468,6 +478,7 @@ function paintWing(
   }
   const { R, U, D } = v;
   for (const side of [1, -1]) {
+    const part = side > 0 ? wing.part : wing.part + LEFT;
     for (let i = 0; i < wing.cols; i++) {
       const sn = Math.sin(TH[i]);
       const cs = Math.cos(TH[i]);
@@ -495,7 +506,7 @@ function paintWing(
       const depth = PD[i] + cc * D[1] + up * ND[i];
       if (depth >= c.depth[k]) continue;
       c.depth[k] = depth;
-      c.part[k] = wing.part;
+      c.part[k] = part;
       c.ink[k] = wingInk(wing.zone[j], wing.tone[j], LIT[i], UNDER[i], k);
     }
   }
@@ -546,11 +557,7 @@ function paintBody(c: Canvas, v: View, phase: number): void {
         blob(
           c,
           v,
-          [
-            side * (4.5 + 4.5 * Math.sqrt(u)),
-            y + swing * 4 * u,
-            -8.5 - 13 * u,
-          ],
+          [side * (5.5 + 6.5 * Math.sqrt(u)), y + swing * 4 * u, -8.5 - 13 * u],
           [2.4 - 1.1 * u, 2.4 - 1.1 * u, 2.4 - 1.1 * u],
           PART.fur,
           fur(1 + u * 1.2),
@@ -563,7 +570,7 @@ function paintBody(c: Canvas, v: View, phase: number): void {
   blob(c, v, [0, 16, 0.5], [8, 6.5, 7.5], PART.fur, fur(0.4), 0.1, 12);
   for (const side of [1, -1])
     blob(c, v, [side * 5.8, 19.6, 3.2], [4.2, 4.2, 4.2], PART.eye, (l) =>
-      l > 0.6 ? GLINT : l < -0.35 ? EYE[1] : EYE[0],
+      l > 0.5 ? GLINT : l < -0.2 ? EYE[1] : EYE[0],
     );
 }
 
@@ -657,7 +664,11 @@ function fillHoles(c: Canvas): void {
     }
 }
 
-const isWing = (p: number) => p === PART.fore || p === PART.hind;
+const isWing = (p: number) =>
+  p === PART.fore ||
+  p === PART.hind ||
+  p === PART.foreLeft ||
+  p === PART.hindLeft;
 
 function outline(c: Canvas): (Rgb | undefined)[] {
   const out = c.ink.slice();
@@ -679,7 +690,7 @@ function outline(c: Canvas): (Rgb | undefined)[] {
         const nearer = c.depth[k] - c.depth[n];
         const edgeHere =
           !p ||
-          (q === p && nearer > 3) ||
+          (q === p && nearer > 3 && !isWing(p)) ||
           (q !== p &&
             nearer > (isWing(p) && isWing(q) ? 0.7 : 0.3) &&
             !(p === PART.feeler || q === PART.feeler));
