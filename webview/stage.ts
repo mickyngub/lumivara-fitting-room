@@ -484,6 +484,7 @@ export class Stage {
     const frame = pose.frame % rows[rowIndex].count;
     const torso = this.torsoOffset(look, pose.direction);
     let body = { x: feet.x - torso, y: feet.y };
+    let wingsX = feet.x;
     if (mount && scene.mount) {
       const ride = ridePlacement(mount, pose.direction, feet, scene.mount.step, scene.mount.bob);
       this.mountSprite
@@ -491,12 +492,16 @@ export class Stage {
         .setFlipX(ride.flip)
         .setPosition(ride.mount.x, ride.mount.y)
         .setVisible(true);
-      // The rider sits where the game seats it; the wings keep to its torso as they do standing.
-      body = ride.rider;
+      // The game puts the sit frame's centre on the seat, but a sit frame can draw
+      // the body well off-centre (the Swordman's by 8 px, its sword held out to
+      // one side), so the preview puts the head over the seat and the wings on it.
+      const head = this.headsOf(look)[rowIndex][frame];
+      body = { x: ride.rider.x - Math.round(head.x - cell.w / 2), y: ride.rider.y };
+      wingsX = ride.rider.x;
     } else this.mountSprite.setVisible(false);
     this.shadow.setScale(mount ? RIDING.shadowScale.x : 1, mount ? RIDING.shadowScale.y : 1);
     this.entity.riding = !!mount;
-    this.entity.sprite.x = body.x + torso;
+    this.entity.sprite.x = wingsX;
     this.entity.sprite.y = body.y;
     this.body
       .setTexture(this.lookTexture(look, scene.lookDyes ?? []), rowIndex * cols + frame)
