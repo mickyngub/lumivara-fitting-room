@@ -13,7 +13,7 @@ import { TIDE_MANTA } from "./mounts/tide-manta";
  * A mount of the fitting room's own, drawn in code the way the game's mount
  * sheets are drawn: one row per direction in RIDING.directions, six frames of
  * one looping cycle each, and the art's lowest pixel 2 px above the cell's
- * bottom, since the game floats every mount over its shadow.
+ * bottom like the game's sheets, so it stands on the shadow.
  */
 export type DrawnMount = {
   id: string;

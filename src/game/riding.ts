@@ -15,8 +15,12 @@ export const RIDING = {
   frameMs: { idle: 140, walk: 75 },
   bobPeriodMs: 2 * Math.PI * 420,
   bob: 2,
-  /** The sheet's cell bottom floats this far above the shadow. */
-  hover: 16,
+  /**
+   * The sheet's cell bottom's height over the shadow's centre. The game floats
+   * mounts at 16; the fitting room stands their art, which every sheet draws
+   * 2 px above the cell bottom, on the shadow instead.
+   */
+  hover: -2,
   /** The rider's feet sit this far below the seat. */
   seatDrop: 3,
   shadowScale: { x: 2.4, y: 1.8 },

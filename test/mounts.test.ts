@@ -103,7 +103,7 @@ for (const m of DRAWN_MOUNTS) {
     );
   });
 
-  test(`${m.id} floats like the game's mounts, its lowest pixel just above the cell bottom in every direction`, () => {
+  test(`${m.id} sits in its cell like the game's mounts, its lowest pixel just above the cell bottom in every direction`, () => {
     for (const direction of RIDING.directions) {
       let lowest = -1;
       for (let frame = 0; frame < RIDING.framesPerDirection; frame++) {

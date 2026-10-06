@@ -76,18 +76,18 @@ test("a mount without a whole cell or a seat for every drawn direction is left o
 test("the rider's feet sit on the game's seat, and the west side mirrors the east side's row", () => {
   const m = pegasus();
   const feet = { x: 100, y: 200 };
-  // The game: cell bottom at feet - 16 - bob, cell left at feet.x - floor(w / 2), rider 3 below the seat.
+  // Cell bottom at feet + 2 - bob (the game floats it at feet - 16 - bob), cell left at feet.x - floor(w / 2), rider 3 below the seat.
   assert.deepEqual(ridePlacement(m, "south", feet, 0, 0), {
     frame: 0,
     flip: false,
-    mount: { x: 100, y: 184 },
-    rider: { x: 44 + 55, y: 184 - 118 + 59 + 3 },
+    mount: { x: 100, y: 202 },
+    rider: { x: 44 + 55, y: 202 - 118 + 59 + 3 },
   });
   assert.deepEqual(ridePlacement(m, "west", feet, 7, 2), {
     frame: 2 * RIDING.framesPerDirection + 1,
     flip: true,
-    mount: { x: 100, y: 182 },
-    rider: { x: 44 + (112 - 1 - 61), y: 182 - 118 + 69 + 3 },
+    mount: { x: 100, y: 200 },
+    rider: { x: 44 + (112 - 1 - 61), y: 200 - 118 + 69 + 3 },
   });
   assert.equal(
     ridePlacement(m, "north-west", feet, 0, 0).frame,
