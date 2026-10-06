@@ -10,6 +10,8 @@
         "check-wings": "node scripts/wing-code.mjs --check",
         "name-frames": "node scripts/name-frames.mjs",
         "check-name-frames": "node scripts/name-frames.mjs --check",
+        "riding-code": "node scripts/riding-code.mjs",
+        "check-riding": "node scripts/riding-code.mjs --check",
         "preflight": "node scripts/preflight.mjs",
         "dev": "vite",
         "build": "node build.ts",

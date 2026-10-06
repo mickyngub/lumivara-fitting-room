@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { getText, need } from "./lumivara.mjs";
+import { canonicalCode, getText, need } from "./lumivara.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const GAME_DIR = join(ROOT, "src", "game");
@@ -13,39 +13,6 @@ const MAX_EXTRACTED_BYTES = 40_000;
 // --check lifts the code in memory and compares it with the bundled file
 // instead of writing it.
 const CHECK = process.argv.includes("--check");
-
-// Minifiers rename variables on every deploy; renaming them canonically (by
-// first appearance) leaves only real changes, while property names and
-// literals stay as they are.
-const canonicalCode = (source) => {
-    const code = source.replace(/^\/\/.*\n/, "");
-    const tree = acorn.parse(code, { ecmaVersion: "latest", sourceType: "module", ranges: true });
-    const ids = [];
-    (function walk(node, parent, key) {
-        if (!node || typeof node.type !== "string") return;
-        if (node.type === "Identifier") {
-            const member = parent?.type === "MemberExpression" && key === "property" && !parent.computed;
-            const propKey =
-                (parent?.type === "Property" || parent?.type === "MethodDefinition") && key === "key" && !parent.computed;
-            if (!member && !propKey) ids.push(node);
-        }
-        for (const k of Object.keys(node)) {
-            if (node.type === "Property" && node.shorthand && k === "key") continue;
-            const child = node[k];
-            if (Array.isArray(child)) child.forEach((c) => walk(c, node, k));
-            else if (child && typeof child.type === "string") walk(child, node, k);
-        }
-    })(tree, null, null);
-    const names = new Map();
-    let out = "";
-    let last = 0;
-    for (const id of ids.sort((a, b) => a.range[0] - b.range[0])) {
-        if (!names.has(id.name)) names.set(id.name, `$${names.size}`);
-        out += code.slice(last, id.range[0]) + names.get(id.name);
-        last = id.range[1];
-    }
-    return out + code.slice(last);
-};
 
 const home = await getText("/");
 const mainChunk = need(home.match(/assets\/main-[\w-]+\.js/)?.[0], "main chunk");
