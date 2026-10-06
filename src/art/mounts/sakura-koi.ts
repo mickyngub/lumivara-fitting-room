@@ -1,7 +1,7 @@
 import type { DrawnMount } from "../mounts";
 import { put, rgb, type Pixels, type Rgb } from "../pixels";
 
-const CELL = { w: 96, h: 90 };
+const CELL = { w: 112, h: 90 };
 const W = CELL.w;
 const H = CELL.h;
 const N_PX = W * H;
@@ -923,12 +923,14 @@ const HEADING: Record<string, [number, number]> = {
   "north-east": [R2, R2],
   north: [0, 1],
 };
+// The body's axis on the cell's centre seen from the front or back, and its long
+// tail given room behind it from the side, as the game centres its mounts.
 const ORIGIN: Record<string, [number, number]> = {
-  south: [55, 68],
-  "south-east": [68, 63],
-  east: [67, 48],
-  "north-east": [58, 37],
-  north: [41, 39],
+  south: [56, 68],
+  "south-east": [70, 63],
+  east: [69, 48],
+  "north-east": [62, 37],
+  north: [56, 39],
 };
 
 function view(direction: string): void {
