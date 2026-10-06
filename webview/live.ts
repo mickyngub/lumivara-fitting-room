@@ -8,7 +8,7 @@ import {
   type LookSource,
 } from "../src/game/catalog";
 import { NAME_FRAME_SLICES } from "../src/game/name-frames";
-import type { Look, NameFrame, WingInfo, WingStyle } from "../src/game/types";
+import type { Look, Mount, NameFrame, WingInfo, WingStyle } from "../src/game/types";
 
 const FETCH_TIMEOUT_MS = 15000;
 const PARALLEL_ATLASES = 4;
@@ -20,6 +20,7 @@ export type Catalog = {
   styles: Record<string, WingStyle>;
   wingTextures: Record<string, string>;
   nameFrames: NameFrame[];
+  mounts: Mount[];
 };
 
 async function fetchOk(url: string): Promise<Response> {
@@ -114,5 +115,6 @@ export async function loadCatalog(
     styles: Object.fromEntries(plan.wings.map((w) => [w.info.id, w.style])),
     wingTextures: Object.assign({}, ...plan.wings.map((w) => w.textures)),
     nameFrames: plan.nameFrames,
+    mounts: plan.mounts,
   };
 }

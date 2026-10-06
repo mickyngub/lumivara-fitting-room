@@ -1,4 +1,5 @@
-import type { Look, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
+import { RIDING } from "./riding";
+import type { Look, Mount, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
 
 export const LUMIVARA = "https://lumivaraonline.com";
 export const COSMETICS_URL = `${LUMIVARA}/cosmetics.json`;
@@ -34,6 +35,7 @@ export type Skin = {
   atlas?: Atlas;
   wings?: WingPlacement;
   nameFrame?: { url: string; gemUrl?: string };
+  mount?: { sheet: string; cell: [number, number]; seat: Record<string, [number, number]> };
 };
 export type Cosmetics = {
   format: number;
@@ -55,9 +57,15 @@ export type CatalogPlan = {
   wingsWithoutEffect: string[];
   nameFrames: NameFrame[];
   nameFramesWithoutSlices: string[];
+  mounts: Mount[];
 };
 
 export const absolute = (path: string) => new URL(path, LUMIVARA).href;
+
+const isPoint = (v: unknown): v is [number, number] =>
+  Array.isArray(v) && v.length === 2 && v.every((n) => Number.isFinite(n));
+const isCell = (v: unknown): v is [number, number] =>
+  isPoint(v) && v.every((n) => Number.isInteger(n) && n > 0);
 
 export function isCosmetics(v: unknown): v is Cosmetics {
   const c = v as Cosmetics;
@@ -75,7 +83,8 @@ export function isCosmetics(v: unknown): v is Cosmetics {
  * the bundled wing code until the file carries it. Name frames take their art
  * from the file and their slices from the game's stylesheet, so a frame the
  * stylesheet has not been lifted for yet is left out. An outfit goes to every
- * class in its classIds the game has, or to its one classId.
+ * class in its classIds the game has, or to its one classId. A mount needs a
+ * sheet, a cell size and a seat for every direction its sheet draws.
  */
 export function planCatalog(
   c: Cosmetics,
@@ -170,7 +179,23 @@ export function planCatalog(
       ...slices,
     });
   }
-  return { build: c.build, looks, wings, wingsWithoutEffect, nameFrames, nameFramesWithoutSlices };
+  const mounts: Mount[] = c.skins.flatMap((s) => {
+    const m = s.mount;
+    if (s.slot !== "mount" || !m || typeof m.sheet !== "string" || !isCell(m.cell)) return [];
+    if (!RIDING.directions.every((d) => isPoint(m.seat?.[d]))) return [];
+    return [
+      {
+        id: s.id,
+        name: s.name,
+        description: s.description ?? "",
+        ...(s.icon ? { icon: absolute(s.icon) } : {}),
+        sheet: absolute(m.sheet),
+        cell: { w: m.cell[0], h: m.cell[1] },
+        seat: Object.fromEntries(RIDING.directions.map((d) => [d, m.seat[d]])),
+      },
+    ];
+  });
+  return { build: c.build, looks, wings, wingsWithoutEffect, nameFrames, nameFramesWithoutSlices, mounts };
 }
 
 type AtlasFrame = {

@@ -1,3 +1,4 @@
+import { RIDING } from "./riding";
 import type { Look } from "./types";
 
 // The game's wing flap is sin(t / 420) standing and sin(t / 130) walking.
@@ -28,6 +29,8 @@ export type PoseFrame = {
   frame: number;
   wingMs: number;
   loop: { ms: number; loopMs: number };
+  /** On a mount: the step of its frames and how far it bobs up. */
+  ride?: { step: number; bob: number };
 };
 
 export const POSES: PoseDef[] = [
@@ -79,10 +82,41 @@ export const POSES: PoseDef[] = [
   },
 ];
 
-export const posesFor = (look: Look): PoseDef[] =>
-  POSES.filter(
-    (p) => !p.needs || look.sheet.rows.some((r) => r.anim === p.needs),
-  );
+// The game keeps a rider on the last sit frame and moves only the mount, its
+// frames stepping faster while walking. A loop holds whole rounds of the
+// mount's frames, and the bob and wing flap are stretched to whole cycles of
+// it: standing, within 5% of the game's periods; walking, a flap 10% slower
+// and a bob about 3 times faster, which keeps a moving card to 6 frames.
+const RIDE_ROUNDS = { idle: 3, walk: 2 };
+const roundMs = (walking: boolean) =>
+  RIDING.framesPerDirection *
+  (walking ? RIDING.frameMs.walk : RIDING.frameMs.idle);
+const closingCycles = (loopMs: number, periodMs: number) =>
+  Math.max(1, Math.round(loopMs / periodMs));
+
+export const RIDING_POSES: PoseDef[] = [
+  {
+    id: "idle",
+    name: "อยู่กับที่",
+    loopMs: RIDE_ROUNDS.idle * roundMs(false),
+    cardFrames: (RIDE_ROUNDS.idle * RIDING.framesPerDirection) / 2,
+    walking: false,
+  },
+  {
+    id: "walk",
+    name: "เคลื่อนที่",
+    loopMs: RIDE_ROUNDS.walk * roundMs(true),
+    cardFrames: (RIDE_ROUNDS.walk * RIDING.framesPerDirection) / 2,
+    walking: true,
+  },
+];
+
+export const posesFor = (look: Look, riding = false): PoseDef[] =>
+  riding
+    ? RIDING_POSES
+    : POSES.filter(
+        (p) => !p.needs || look.sheet.rows.some((r) => r.anim === p.needs),
+      );
 
 export const poseById = (id: string): PoseDef =>
   POSES.find((p) => p.id === id) ?? POSES[0];
@@ -103,8 +137,27 @@ export function poseAt(
   look: Look,
   direction: string,
   t: number,
+  riding = false,
 ): PoseFrame {
   const loop = { ms: t, loopMs: pose.loopMs };
+  if (riding) {
+    const flapMs = pose.walking ? FLAP_PERIOD_MS.walk : FLAP_PERIOD_MS.idle;
+    const bobs = closingCycles(pose.loopMs, RIDING.bobPeriodMs);
+    return {
+      anim: "sit",
+      frame: Math.max(0, frameCount(look, "sit", direction) - 1),
+      wingMs: (t * closingCycles(pose.loopMs, flapMs) * flapMs) / pose.loopMs,
+      loop,
+      ride: {
+        step: Math.floor(
+          t / (pose.walking ? RIDING.frameMs.walk : RIDING.frameMs.idle),
+        ),
+        bob: Math.round(
+          Math.sin((2 * Math.PI * bobs * t) / pose.loopMs) * RIDING.bob,
+        ),
+      },
+    };
+  }
   switch (pose.id) {
     case "idle":
       return {

@@ -1,7 +1,7 @@
 import { CARD, FRAME, LOGO, PLATE } from "../src/card";
 import { apng } from "./apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
-import type { Look, NameFrame, WingInfo } from "../src/game/types";
+import type { Look, Mount, NameFrame, WingInfo } from "../src/game/types";
 import { MAX_OWN_WINGS, type DriverToWebview, type SavedWing, type WebviewToDriver } from "../src/messages";
 import { drawnWings, isUploadId, newUploadId, readWing, uploadedWing, WING_AURAS, WING_SIZES, type OwnWing } from "./own-wings";
 import { cleanName, NAME_MAX } from "../src/name";
@@ -61,6 +61,7 @@ let CLASS_LOOKS: Look[] = [];
 let OUTFITS: Look[] = [];
 let WINGS: WingInfo[] = [];
 let NAME_FRAMES: NameFrame[] = [];
+let MOUNTS: Mount[] = [];
 const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes(classId));
 
 let classId = "";
@@ -94,6 +95,10 @@ let accessoryId: string | null = null;
 // Each accessory keeps the colour it was given.
 const accessoryDyes = new Map<string, string>();
 const accessoryDye = () => (accessoryId ? (accessoryDyes.get(accessoryId) ?? null) : null);
+// The mount ridden, set once its sheet is in the preview, and the one last picked.
+let mountId: string | null = null;
+let mountPicked: string | null = null;
+const mountSheets = new Map<string, Promise<HTMLImageElement>>();
 let nameFrameId: string | null = null;
 const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
 type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
@@ -140,12 +145,15 @@ const lookDyesOf = (id: string) => lookDyes.get(id) ?? [];
 const PART_NAMES = ["สีหลัก", "สีรอง", "สีที่ 3"];
 const lookParts = (): Hsl[] => (catalog && live ? live.partsOf(look()) : []);
 const png = (b64: string) => `data:image/png;base64,${b64}`;
-// A look without the chosen pose (cast is the Mage's) stands instead, and gets the pose back when it is chosen again.
-const poseOf = (l: Look): PoseDef => posesFor(l).find((p) => p.id === poseId) ?? poseById("idle");
+// A look without the chosen pose (cast is the Mage's), or a rider, stands instead, and gets the pose back when it is chosen again.
+const poseOf = (l: Look): PoseDef => {
+  const poses = posesFor(l, !!mountId);
+  return poses.find((p) => p.id === poseId) ?? poses.find((p) => p.id === "idle") ?? poseById("idle");
+};
 
 function sceneAt(l: Look, direction: string, t: number): Scene {
   const pose = poseOf(l);
-  const f = poseAt(pose, l, direction, t);
+  const f = poseAt(pose, l, direction, t, !!mountId);
   return {
     look: l,
     wings: isUploadId(wingsId) ? (ownWings.get(wingsId)?.id ?? null) : wingsId,
@@ -153,6 +161,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
     lookDyes: lookDyesOf(l.id),
     accessory: accessoryId,
     accessoryDye: accessoryDye(),
+    mount: mountId && f.ride ? { id: mountId, ...f.ride } : null,
     pose: { direction, anim: f.anim, frame: f.frame, walking: pose.walking },
     wingMs: f.wingMs,
     loop: f.loop,
@@ -321,11 +330,16 @@ function renderChoices(): void {
   document
     .querySelectorAll<HTMLElement>("[data-name-frame]")
     .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.nameFrame || null) === nameFrameId)));
+  document.querySelectorAll<HTMLElement>("[data-mount]").forEach((n) => {
+    const id = n.dataset.mount || null;
+    n.setAttribute("aria-pressed", String(id === mountId));
+    n.setAttribute("aria-busy", String(!!id && id === mountPicked && id !== mountId));
+  });
   syncWingDyes();
   syncLookDyes();
   const current = poseOf(look()).id;
   document.getElementById("poses")!.replaceChildren(
-    ...posesFor(look()).map((p) =>
+    ...posesFor(look(), !!mountId).map((p) =>
       h(
         "button",
         {
@@ -550,6 +564,8 @@ async function exportCard(l: Look): Promise<string> {
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const own = isUploadId(wingsId) ? ownWings.get(wingsId) : undefined;
   if (own) await exporter.useWing(own.id, own.style);
+  const mount = MOUNTS.find((m) => m.id === mountId);
+  if (mount) await exporter.useMount(mount, await mountSheet(mount));
   const direction = DIRECTIONS[dirIndex];
   const { cardFrames, loopMs } = poseOf(l);
   const lines = nameplate(playerName, plainLook().className);
@@ -686,6 +702,9 @@ function buildLayout(): void {
     dyeTray(WING_TRAY),
     h("p", { id: "wing-error", class: "wing-error", role: "alert", hidden: true }),
     h("input", { id: "wing-file", type: "file", accept: "image/png,image/webp,image/gif,image/jpeg", hidden: true, onchange: onWingFile }),
+    h("h2", {}, "สัตว์ขี่"),
+    h("div", { id: "mounts", class: "frames wings", role: "radiogroup", "aria-label": "สัตว์ขี่" }, ...skeletons(4, "wing")),
+    h("p", { id: "mount-error", class: "wing-error", role: "alert", hidden: true }),
     h("h2", {}, "เครื่องประดับ"),
     h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ", onscroll: () => syncDyes(ACCESSORY_TRAY) }),
     dyeTray(ACCESSORY_TRAY),
@@ -877,6 +896,59 @@ function renderWings(): void {
 
 function setWings(id: string | null): void {
   wingsId = id;
+  renderChoices();
+}
+
+function renderMounts(): void {
+  document.getElementById("mounts")!.replaceChildren(
+    h("button", { type: "button", class: "wing", "data-mount": "", onclick: () => void setMount(null) }, h("span", { class: "none" }, "ไม่ขี่")),
+    ...MOUNTS.map((m) =>
+      h(
+        "button",
+        { type: "button", class: "wing", "data-mount": m.id, title: m.description, onclick: () => void setMount(m.id) },
+        m.icon && h("img", { src: m.icon, alt: "", width: 36, height: 36 }),
+        h("span", {}, m.name),
+      ),
+    ),
+  );
+}
+
+function showMountError(message: string | null): void {
+  const node = document.getElementById("mount-error")!;
+  node.textContent = message ?? "";
+  node.hidden = !message;
+}
+
+function mountSheet(mount: Mount): Promise<HTMLImageElement> {
+  let sheet = mountSheets.get(mount.id);
+  if (!sheet) {
+    sheet = loadImage(mount.sheet);
+    sheet.catch(() => mountSheets.delete(mount.id));
+    mountSheets.set(mount.id, sheet);
+  }
+  return sheet;
+}
+
+/** Puts the character on a mount once its sheet is in the preview; the latest pick wins. */
+async function setMount(id: string | null): Promise<void> {
+  const mount = MOUNTS.find((m) => m.id === id);
+  mountPicked = mount ? mount.id : null;
+  showMountError(null);
+  if (!mount || !live) {
+    mountId = null;
+    renderChoices();
+    return;
+  }
+  renderChoices();
+  try {
+    await live.useMount(mount, await mountSheet(mount));
+    if (mountPicked !== mount.id) return;
+    mountId = mount.id;
+  } catch (err) {
+    if (mountPicked !== mount.id) return;
+    mountPicked = mountId;
+    showMountError(`โหลด ${mount.name} จาก Lumivara ไม่ได้ (${errorText(err)})`);
+  }
   renderChoices();
 }
 
@@ -1315,6 +1387,8 @@ function openRoom(): void {
   OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
   WINGS = [...catalog.wings, ...own.map((w) => w.info)];
   NAME_FRAMES = catalog.nameFrames;
+  MOUNTS = catalog.mounts;
+  mountId = mountPicked = null;
   classId = OUTFITS[0]?.classId ?? CLASS_LOOKS[0].classId;
   outfitId = OUTFITS[0]?.id ?? null;
   wingsId = WINGS[0]?.id ?? null;
@@ -1323,6 +1397,7 @@ function openRoom(): void {
   pendingWings = null;
   if (wings) restoreWings(wings);
   renderWings();
+  renderMounts();
   renderNameFrames();
   renderPickers();
   document.querySelector<HTMLButtonElement>(".primary")!.disabled = false;

@@ -5,7 +5,8 @@ import { clothParts, dyeCloth, dyePixels, dyeRgb, dyeShades, hexToHsl, mainColou
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { pixels } from "../src/art/pixels";
 import { findHeads, type Head } from "../src/game/head";
-import type { Look, WingStyle } from "../src/game/types";
+import { RIDING, ridePlacement } from "../src/game/riding";
+import type { Look, Mount, WingStyle } from "../src/game/types";
 
 const FEET_OFFSET = 9;
 const BODY_DEPTH = 10;
@@ -18,6 +19,11 @@ const BACKDROP_DEPTH = -1e6;
 const TORSO_BAND = { top: 26, bottom: 16 };
 // A dyed sheet is as big as the look's, so only the latest few are kept.
 const DYED_LOOKS_KEPT = 3;
+// A rider on a mount stands about twice as tall, so a mounted scene is drawn at
+// the game's size over twice the picture and shown at half the zoom, its feet,
+// backdrop and name tag where they were.
+const MOUNTED_ZOOM_OUT = 2;
+const mountKey = (id: string) => `mount:${id}`;
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
@@ -44,6 +50,8 @@ export type Scene = {
   accessory?: string | null;
   /** A colour for the accessory's body, or none for its own. */
   accessoryDye?: string | null;
+  /** The mount ridden, the step of its frames and its bob, or none. */
+  mount?: { id: string; step: number; bob: number } | null;
   pose: Pose;
   wingMs: number;
   loop: BackdropTime;
@@ -94,6 +102,11 @@ export class Stage {
   readonly ready: Promise<void>;
   private body!: Phaser.GameObjects.Sprite;
   private accessory!: Phaser.GameObjects.Image;
+  private shadow!: Phaser.GameObjects.Ellipse;
+  private mountSprite!: Phaser.GameObjects.Sprite;
+  private backdropImage!: Phaser.GameObjects.Image;
+  private readonly mounts = new Map<string, Mount>();
+  private zoomOut = 1;
   private readonly heads = new Map<string, Head[][]>();
   private textures!: Phaser.Textures.TextureManager;
   private readonly torsoOffsets = new Map<string, Map<string, number>>();
@@ -133,33 +146,29 @@ export class Stage {
         const texture = this.textures.createCanvas("backdrop", width, height)!;
         stage.backdropTexture = texture;
         stage.paintBackdrop();
-        this.add.image(0, 0, "backdrop").setOrigin(0).setDepth(BACKDROP_DEPTH);
+        stage.backdropImage = this.add.image(0, 0, "backdrop").setOrigin(0).setDepth(BACKDROP_DEPTH);
         stage.textures = this.textures;
-        const groundY = feet.y - FEET_OFFSET;
-        this.add
-          .ellipse(
-            feet.x,
-            feet.y,
-            SHADOW.w,
-            SHADOW.h,
-            SHADOW.color,
-            SHADOW.alpha,
-          )
-          .setDepth(groundY - 1);
-        stage.body = this.add
-          .sprite(feet.x, feet.y, looks[0].id, 0)
-          .setDepth(groundY + BODY_DEPTH);
+        stage.shadow = this.add.ellipse(
+          feet.x,
+          feet.y,
+          SHADOW.w,
+          SHADOW.h,
+          SHADOW.color,
+          SHADOW.alpha,
+        );
+        stage.mountSprite = this.add.sprite(0, 0, "__DEFAULT").setOrigin(0.5, 1).setVisible(false);
+        stage.body = this.add.sprite(feet.x, feet.y, looks[0].id, 0);
         stage.accessory = this.add
           .image(0, 0, "__DEFAULT")
           .setOrigin(0)
-          .setDepth(groundY + ACCESSORY_DEPTH)
           .setVisible(false);
         stage.entity = Object.assign(
           {
             x: feet.x,
-            y: groundY,
+            y: feet.y - FEET_OFFSET,
             dead: false,
             sitting: false,
+            riding: false,
             wasWalking: false,
             direction: "south",
             wings: undefined,
@@ -177,6 +186,7 @@ export class Stage {
           },
           kit.methods,
         );
+        stage.placeGround();
         markReady();
       }
 
@@ -233,6 +243,40 @@ export class Stage {
       if (!this.textures.exists(style.texture)) this.textures.addImage(style.texture, image);
     }
     kit.config[id] = style;
+  }
+
+  /** Gives the stage a mount's sheet, cut into the frames the game cuts it into. */
+  async useMount(mount: Mount, sheet: HTMLImageElement): Promise<void> {
+    await this.ready;
+    const key = mountKey(mount.id);
+    if (!this.textures.exists(key)) this.textures.addSpriteSheet(key, sheet, { frameWidth: mount.cell.w, frameHeight: mount.cell.h });
+    this.mounts.set(mount.id, mount);
+  }
+
+  /** Where the feet are in the view the scene is drawn in. */
+  private feet(): { x: number; y: number } {
+    const { x, y } = this.options.feet;
+    return { x: x * this.zoomOut, y: y * this.zoomOut };
+  }
+
+  /** Sets the shadow and the depths the game gives everything on the ground under the feet. */
+  private placeGround(): void {
+    const feet = this.feet();
+    const groundY = feet.y - FEET_OFFSET;
+    this.shadow.setPosition(feet.x, feet.y).setDepth(groundY - 1);
+    this.mountSprite.setDepth(groundY + RIDING.depth);
+    this.body.setDepth(groundY + BODY_DEPTH);
+    this.accessory.setDepth(groundY + ACCESSORY_DEPTH);
+    this.entity.x = feet.x;
+    this.entity.y = groundY;
+  }
+
+  private setZoomOut(zoomOut: number): void {
+    if (zoomOut === this.zoomOut) return;
+    this.zoomOut = zoomOut;
+    this.game.scale.resize(this.options.width * zoomOut, this.options.height * zoomOut);
+    this.backdropImage.setScale(zoomOut);
+    this.placeGround();
   }
 
   /** Stops the engine and removes its canvas, so a stage that failed to start can be built again. */
@@ -396,7 +440,7 @@ export class Stage {
   }
 
   /** Sets the accessory on the head of the frame the body shows; it floats in step with the card's loop. */
-  private placeAccessory(scene: Scene, rowIndex: number, frame: number, bodyX: number): void {
+  private placeAccessory(scene: Scene, rowIndex: number, frame: number, body: { x: number; y: number }): void {
     const accessory = ACCESSORIES.find((a) => a.id === scene.accessory);
     if (!accessory) {
       this.accessory.setVisible(false);
@@ -410,15 +454,17 @@ export class Stage {
     this.accessory
       .setTexture(this.accessoryTexture(accessory, head.w, facing, scene.accessoryDye ?? null))
       .setPosition(
-        Math.round(bodyX - cell.w / 2 + head.x - 0.5) - ACCESSORY_ART.x,
-        this.options.feet.y - baseline + head.top - ACCESSORY_ART.top + bob,
+        Math.round(body.x - cell.w / 2 + head.x - 0.5) - ACCESSORY_ART.x,
+        body.y - baseline + head.top - ACCESSORY_ART.top + bob,
       )
       .setVisible(true);
   }
 
   private apply(scene: Scene): void {
     const { look, pose } = scene;
-    const { feet } = this.options;
+    const mount = scene.mount ? this.mounts.get(scene.mount.id) : undefined;
+    this.setZoomOut(mount ? MOUNTED_ZOOM_OUT : 1);
+    const feet = this.feet();
     const dye = scene.dye ?? null;
     if (scene.wings !== this.wingsId || dye !== this.dye) {
       const id = scene.wings && dye ? this.dyedWings(scene.wings, dye) : scene.wings;
@@ -436,12 +482,27 @@ export class Stage {
     const rowIndex = Math.max(0, rowOf(pose.anim) >= 0 ? rowOf(pose.anim) : rowOf("idle"));
     const cols = Math.max(...rows.map((r) => r.count));
     const frame = pose.frame % rows[rowIndex].count;
-    const bodyX = feet.x - this.torsoOffset(look, pose.direction);
+    const torso = this.torsoOffset(look, pose.direction);
+    let body = { x: feet.x - torso, y: feet.y };
+    if (mount && scene.mount) {
+      const ride = ridePlacement(mount, pose.direction, feet, scene.mount.step, scene.mount.bob);
+      this.mountSprite
+        .setTexture(mountKey(mount.id), ride.frame)
+        .setFlipX(ride.flip)
+        .setPosition(ride.mount.x, ride.mount.y)
+        .setVisible(true);
+      // The rider sits where the game seats it; the wings keep to its torso as they do standing.
+      body = ride.rider;
+    } else this.mountSprite.setVisible(false);
+    this.shadow.setScale(mount ? RIDING.shadowScale.x : 1, mount ? RIDING.shadowScale.y : 1);
+    this.entity.riding = !!mount;
+    this.entity.sprite.x = body.x + torso;
+    this.entity.sprite.y = body.y;
     this.body
       .setTexture(this.lookTexture(look, scene.lookDyes ?? []), rowIndex * cols + frame)
       .setOrigin(0.5, baseline / cell.h)
-      .setPosition(bodyX, feet.y);
-    this.placeAccessory(scene, rowIndex, frame, bodyX);
+      .setPosition(body.x, body.y);
+    this.placeAccessory(scene, rowIndex, frame, body);
     this.entity.drawWings({ visible: true, y: feet.y - FEET_OFFSET });
     if (this.animatedBackdrop) {
       this.backdropTime = scene.loop;
@@ -452,6 +513,8 @@ export class Stage {
   /** Renders one scene and resolves with the frame the game drew. */
   async capture(scene: Scene): Promise<HTMLImageElement> {
     await this.ready;
+    // A snapshot keeps the canvas size it was asked at, so the view changes first.
+    this.setZoomOut(scene.mount && this.mounts.has(scene.mount.id) ? MOUNTED_ZOOM_OUT : 1);
     this.override = scene;
     const shot = await new Promise<HTMLImageElement>((resolve) =>
       this.game.renderer.snapshot((image) =>

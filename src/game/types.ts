@@ -41,6 +41,17 @@ export type WingStyle = {
   rimUrl?: string;
 };
 
+/** A mount from cosmetics.json: its sheet of frames and where the rider sits in each drawn direction. */
+export type Mount = {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  sheet: string;
+  cell: { w: number; h: number };
+  seat: Record<string, [number, number]>;
+};
+
 /** Top, right, bottom, left, in CSS order. */
 export type Edges = [number, number, number, number];
 

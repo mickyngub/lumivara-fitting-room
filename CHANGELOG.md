@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+
+- สัตว์ขี่: ขี่ Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox หรือ Frostveil Skystag จากเกม ตัวละครนั่งบนหลังและปีกลดต่ำลงเหมือนในเกม หมุนดูได้รอบตัว วางเป็นการ์ดที่ขยับได้ และสัตว์ขี่ใหม่ในเกมขึ้นเองโดยไม่ต้องอัปเดต · mounts: ride the game's Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox or Frostveil Skystag, seated with lowered wings as in the game, all the way round and on an animated card, with new mounts showing up on their own
+- Wrathflame Wings ลุกเป็นไฟและมีสะเก็ดไฟลอยขึ้นเหมือนในเกม · Wrathflame Wings flicker with the game's fire and rising embers
+
 ## 1.4.0
 
 - ปีกเพิ่ม 10 แบบ: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon และ Clockwork Wings ขยับ เปลี่ยนสี และมีแสงแบบปีกในเกม · 10 more wings: Raven, Mecha, Bone, Leaf, Cosmic, Origami, Blade, Magma, Neon and Clockwork Wings, flapping, dyeable and glowing like the game's

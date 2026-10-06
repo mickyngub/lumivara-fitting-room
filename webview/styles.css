@@ -553,6 +553,12 @@ h2 {
     box-shadow: 0 0 14px rgba(201, 164, 92, 0.45);
 }
 
+.wing[aria-busy="true"] {
+    border-style: dashed;
+    border-color: var(--gold-dark);
+    opacity: 0.7;
+}
+
 .dye-chip {
     position: absolute;
     top: 6px;
