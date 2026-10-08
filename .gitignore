@@ -4,3 +4,4 @@ dist/
 # Lumivara's art: copied in by mirror/sync.ts and deployed, never committed to this public repo.
 mirror/public/*
 !mirror/public/_headers
+dev/previews/
