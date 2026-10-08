@@ -1,12 +1,20 @@
 import { RIDING } from "../game/riding";
 import { pixels, type Pixels } from "./pixels";
 import { AURORA_JELLY } from "./mounts/aurora-jelly";
+import { BAMBOO_PANDA } from "./mounts/bamboo-panda";
+import { CLOCKWORK_STEED } from "./mounts/clockwork-steed";
+import { CLOUD_WHALE } from "./mounts/cloud-whale";
+import { CORAL_SEAHORSE } from "./mounts/coral-seahorse";
 import { CRYSTAL_TORTOISE } from "./mounts/crystal-tortoise";
 import { EMBER_DRAKE } from "./mounts/ember-drake";
 import { MOON_MOTH } from "./mounts/moon-moth";
+import { MUSHROOM_SNAIL } from "./mounts/mushroom-snail";
 import { SAKURA_KOI } from "./mounts/sakura-koi";
 import { SAND_SCARAB } from "./mounts/sand-scarab";
+import { SHADOW_PANTHER } from "./mounts/shadow-panther";
 import { STORM_GRIFFIN } from "./mounts/storm-griffin";
+import { SUN_LION } from "./mounts/sun-lion";
+import { THUNDER_RAM } from "./mounts/thunder-ram";
 import { TIDE_MANTA } from "./mounts/tide-manta";
 
 /**
@@ -35,6 +43,14 @@ export const DRAWN_MOUNTS: DrawnMount[] = [
   SAND_SCARAB,
   SAKURA_KOI,
   AURORA_JELLY,
+  SUN_LION,
+  SHADOW_PANTHER,
+  MUSHROOM_SNAIL,
+  BAMBOO_PANDA,
+  CLOCKWORK_STEED,
+  CLOUD_WHALE,
+  THUNDER_RAM,
+  CORAL_SEAHORSE,
 ];
 
 /** The mount's whole sheet, laid out like the game's: a row per drawn direction, a column per frame. */
