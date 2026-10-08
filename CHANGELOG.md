@@ -6,6 +6,7 @@
 - สัตว์ขี่: ขี่ Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox หรือ Frostveil Skystag จากเกม ตัวละครนั่งบนหลังและปีกลดต่ำลงเหมือนในเกม หมุนดูได้รอบตัว วางเป็นการ์ดที่ขยับได้ และสัตว์ขี่ใหม่ในเกมขึ้นเองโดยไม่ต้องอัปเดต · mounts: ride the game's Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox or Frostveil Skystag, seated with lowered wings as in the game, all the way round and on an animated card, with new mounts showing up on their own
 - สัตว์ขี่ของห้องแต่งตัว 8 ตัว: Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi และ Aurora Jelly วาดเป็นพิกเซลอาร์ตแบบสัตว์ขี่ในเกม ขยับได้ทุกทิศ · 8 mounts of the fitting room's own: the Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi and Aurora Jelly, pixel art like the game's mounts, moving in every direction
 - Wrathflame Wings ลุกเป็นไฟและมีสะเก็ดไฟลอยขึ้นเหมือนในเกม · Wrathflame Wings flicker with the game's fire and rising embers
+- Soulreaper Scythes มีประกายและวิญญาณลอยรอบเคียวเหมือนในเกม · Soulreaper Scythes shimmer with the game's twinkles and drifting souls
 
 ## 1.4.0
 
