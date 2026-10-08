@@ -7,8 +7,10 @@ const cosmetics: { classes: { id: string }[] } = JSON.parse(
   readFileSync(new URL("./fixtures/cosmetics.json", import.meta.url), "utf8"),
 );
 const classIds = cosmetics.classes.map((c) => c.id);
+// The Kensei's plain clothes are grey, which a dye leaves as drawn, so a skin would only recolour its sword grip.
+const UNDYEABLE = ["kensei"];
 
-test("every class of the game has three skins of the fitting room's own", () => {
+test("every class of the game whose clothes take a dye has three skins of the fitting room's own", () => {
   assert.ok(classIds.length > 0, "the fixture lists the game's classes");
   for (const skin of CLASS_SKINS)
     assert.ok(
@@ -18,7 +20,7 @@ test("every class of the game has three skins of the fitting room's own", () => 
   for (const id of classIds)
     assert.equal(
       CLASS_SKINS.filter((s) => s.classId === id).length,
-      3,
+      UNDYEABLE.includes(id) ? 0 : 3,
       `${id} skins`,
     );
 });
