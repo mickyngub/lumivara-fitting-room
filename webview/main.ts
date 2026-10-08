@@ -15,6 +15,7 @@ import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessori
 import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
 import { dyePixels, dyeShades, hexToHsl, hslToRgb, mainColour, type Hsl } from "../src/art/dye";
+import { CLASS_SKINS, type ClassSkin } from "../src/art/skins";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
@@ -67,6 +68,7 @@ const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes
 
 let classId = "";
 let outfitId: string | null = null;
+let skinId: string | null = null;
 let wingsId: string | null = null;
 // Each wing keeps the colour it was given.
 const wingDyes = new Map<string, string>();
@@ -140,6 +142,13 @@ function h<K extends keyof HTMLElementTagNameMap>(
 
 const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
 const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
+const skin = (): ClassSkin | undefined => (outfitId ? undefined : CLASS_SKINS.find((s) => s.id === skinId && s.classId === classId));
+const skinsOf = (id: string) => CLASS_SKINS.filter((s) => s.classId === id);
+// A skin is the plain look under colours of its own, kept apart from the plain look's.
+const dyeKey = (l: Look): string => {
+  const s = skin();
+  return s && l.id === plainLook().id ? `skin:${s.id}` : l.id;
+};
 // Each look keeps the colours its clothes' parts were given.
 const lookDyes = new Map<string, (string | null)[]>();
 const lookDyesOf = (id: string) => lookDyes.get(id) ?? [];
@@ -159,7 +168,7 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
     look: l,
     wings: isUploadId(wingsId) ? (ownWings.get(wingsId)?.id ?? null) : wingsId,
     dye: wingDye(),
-    lookDyes: lookDyesOf(l.id),
+    lookDyes: lookDyesOf(dyeKey(l)),
     accessory: accessoryId,
     accessoryDye: accessoryDye(),
     mount: mountId && f.ride ? { id: mountId, ...f.ride } : null,
@@ -169,12 +178,11 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
   };
 }
 
-function thumb(l: Look, size: number): HTMLElement {
+const thumbRowOf = (l: Look) => Math.max(0, l.sheet.rows.findIndex((r) => r.anim === THUMB_ROW.anim && r.dir === THUMB_ROW.dir));
+
+function thumb(l: Look, size: number, frame?: string): HTMLElement {
   const { cell, rows } = l.sheet;
-  const row = Math.max(
-    0,
-    rows.findIndex((r) => r.anim === THUMB_ROW.anim && r.dir === THUMB_ROW.dir),
-  );
+  const row = thumbRowOf(l);
   const cols = Math.max(...rows.map((r) => r.count));
   const s = size / cell.w;
   return h("span", {
@@ -182,9 +190,9 @@ function thumb(l: Look, size: number): HTMLElement {
     style: [
       `width:${size}px`,
       `height:${Math.round(cell.h * s)}px`,
-      `background-image:url(${png(l.sheet.png)})`,
-      `background-size:${cols * cell.w * s}px ${rows.length * cell.h * s}px`,
-      `background-position:0 ${-row * cell.h * s}px`,
+      `background-image:url(${frame ?? png(l.sheet.png)})`,
+      frame ? `background-size:${size}px ${Math.round(cell.h * s)}px` : `background-size:${cols * cell.w * s}px ${rows.length * cell.h * s}px`,
+      frame ? "background-position:0 0" : `background-position:0 ${-row * cell.h * s}px`,
     ].join(";"),
   });
 }
@@ -260,6 +268,7 @@ function renderClasses(): void {
         () => {
           classId = c.classId;
           outfitId = null;
+          skinId = null;
           renderPickers();
         },
         outfitsOf(c.classId).length ? "มีชุด" : undefined,
@@ -275,18 +284,40 @@ function dyeable(tile: HTMLElement, l: Look): HTMLElement {
   return tile;
 }
 
+function skinTile(s: ClassSkin): HTMLElement {
+  const plain = plainLook();
+  const tile = h(
+    "button",
+    { type: "button", class: "look", title: s.name, "aria-pressed": String(skin()?.id === s.id), onclick: () => chooseSkin(s) },
+    thumb(plain, 56, live?.dyedFrame(plain, s.dyes, thumbRowOf(plain), 0) ?? undefined),
+    h("span", { class: "look-name" }, s.name),
+    h("em", {}, "สกิน"),
+  );
+  tile.dataset.look = `skin:${s.id}`;
+  return tile;
+}
+
+function chooseSkin(s: ClassSkin): void {
+  outfitId = null;
+  skinId = s.id;
+  if (!lookDyes.has(`skin:${s.id}`)) lookDyes.set(`skin:${s.id}`, [...s.dyes]);
+  renderPickers();
+}
+
 function renderFashion(): void {
   const plain = plainLook();
   const outfits = outfitsOf(classId);
   const withOutfits = CLASS_LOOKS.filter((c) => outfitsOf(c.classId).length).map((c) => c.className).join(", ");
   document.getElementById("fashion")!.replaceChildren(
     dyeable(
-      pick(plain, "ชุดปกติ", outfitId === null, () => {
+      pick(plain, "ชุดปกติ", outfitId === null && !skin(), () => {
         outfitId = null;
+        skinId = null;
         renderPickers();
       }),
       plain,
     ),
+    ...skinsOf(classId).map(skinTile),
     ...outfits.map((o) =>
       dyeable(
         pick(
@@ -295,6 +326,7 @@ function renderFashion(): void {
           outfitId === o.id,
           () => {
             outfitId = o.id;
+            skinId = null;
             renderPickers();
           },
           "แฟชั่น",
@@ -817,6 +849,7 @@ function startStage(): void {
     // Neither may keep the cover down: the preview works without them.
     try {
       fitStage();
+      renderFashion();
       syncLookDyes();
     } catch (err) {
       console.error(err);
@@ -1144,11 +1177,11 @@ const LOOK_TRAY: DyeTray = {
       id: `look-dyes-${k}`,
       label: PART_NAMES[k],
       part: hexOf(part),
-      current: () => lookDyesOf(look().id)[k] ?? null,
+      current: () => lookDyesOf(dyeKey(look()))[k] ?? null,
       set: (hex) => setLookDye(k, hex),
     })),
-  tile: () => (catalog ? document.querySelector<HTMLElement>(`[data-look="${look().id}"]`) : null),
-  title: () => (lookParts().length ? `สีของ ${outfitId ? look().name : "ชุดปกติ"}` : null),
+  tile: () => (catalog ? document.querySelector<HTMLElement>(`[data-look="${dyeKey(look())}"]`) : null),
+  title: () => (lookParts().length ? `สีของ ${outfitId ? look().name : (skin()?.name ?? "ชุดปกติ")}` : null),
 };
 
 const ACCESSORY_TRAY: DyeTray = {
@@ -1227,7 +1260,7 @@ function syncWingDyes(): void {
 let lookRows = "";
 
 function syncLookDyes(): void {
-  const rows = catalog ? `${look().id}:${lookParts().length}` : "";
+  const rows = catalog ? `${dyeKey(look())}:${lookParts().length}` : "";
   if (rows !== lookRows) {
     lookRows = rows;
     renderDyes(LOOK_TRAY);
@@ -1243,10 +1276,11 @@ function syncLookDyes(): void {
 
 function setLookDye(part: number, hex: string | null): void {
   if (!catalog) return;
-  const dyes = [...lookDyesOf(look().id)];
+  const key = dyeKey(look());
+  const dyes = [...lookDyesOf(key)];
   dyes[part] = hex;
-  if (dyes.some(Boolean)) lookDyes.set(look().id, Array.from(dyes, (d) => d ?? null));
-  else lookDyes.delete(look().id);
+  if (dyes.some(Boolean)) lookDyes.set(key, Array.from(dyes, (d) => d ?? null));
+  else lookDyes.delete(key);
   syncLookDyes();
 }
 

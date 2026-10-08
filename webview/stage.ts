@@ -24,6 +24,7 @@ const DYED_LOOKS_KEPT = 3;
 // backdrop and name tag where they were.
 const MOUNTED_ZOOM_OUT = 2;
 const mountKey = (id: string) => `mount:${id}`;
+const targetsOf = (cloth: Cloth, dyes: (string | null)[]): (Hsl | null)[] => cloth.parts.map((_, k) => (dyes[k] ? hexToHsl(dyes[k]!) : null));
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
@@ -120,6 +121,7 @@ export class Stage {
   private readonly mainColours = new Map<string, Hsl>();
   private readonly cloth = new Map<string, Cloth | null>();
   private readonly dyedLooks: string[] = [];
+  private dyedFrames = new Map<string, string>();
   private override: Scene | null = null;
   private readonly game: Phaser.Game;
 
@@ -402,8 +404,7 @@ export class Stage {
     const key = `${look.id}~${dyes.join(",")}`;
     if (this.textures.exists(key)) return key;
     const { canvas, ctx, image } = this.sourcePixels(look.id);
-    const targets = cloth.parts.map((_, k) => (dyes[k] ? hexToHsl(dyes[k]!) : null));
-    dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targets);
+    dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes));
     ctx.putImageData(image, 0, 0);
     const texture = this.textures.addCanvas(key, canvas)!;
     const { w, h } = look.sheet.cell;
@@ -412,6 +413,28 @@ export class Stage {
     this.dyedLooks.push(key);
     if (this.dyedLooks.length > DYED_LOOKS_KEPT) this.textures.remove(this.dyedLooks.shift()!);
     return key;
+  }
+
+  /** One frame of the look's sheet with its clothes dyed, as a PNG data URL; null before the stage has booted. */
+  dyedFrame(look: Look, dyes: (string | null)[], row: number, col: number): string | null {
+    if (!this.textures) return null;
+    const key = `${look.id}~${dyes.join(",")}~${row}~${col}`;
+    const cached = this.dyedFrames.get(key);
+    if (cached) return cached;
+    const { canvas, ctx, image } = this.sourcePixels(look.id);
+    const cloth = dyes.some(Boolean) ? this.clothOf(look) : null;
+    if (cloth) {
+      dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes));
+      ctx.putImageData(image, 0, 0);
+    }
+    const { w, h } = look.sheet.cell;
+    const frame = document.createElement("canvas");
+    frame.width = w;
+    frame.height = h;
+    frame.getContext("2d")!.drawImage(canvas, col * w, row * h, w, h, 0, 0, w, h);
+    const url = frame.toDataURL("image/png");
+    this.dyedFrames.set(key, url);
+    return url;
   }
 
   private headsOf(look: Look): Head[][] {
