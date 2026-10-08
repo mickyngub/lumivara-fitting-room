@@ -14,6 +14,16 @@ import {
   type Rgb,
 } from "./pixels";
 import { calm, GOLD, jagged, line, PLUS, stars, WHITE } from "./scene-kit";
+import { autumnLeaves } from "./scenes/autumn-leaves";
+import { bambooGrove } from "./scenes/bamboo-grove";
+import { candyLand } from "./scenes/candy-land";
+import { graveyard } from "./scenes/graveyard";
+import { lanterns } from "./scenes/lanterns";
+import { nebula } from "./scenes/nebula";
+import { neonRain } from "./scenes/neon-rain";
+import { rainbowSky } from "./scenes/rainbow-sky";
+import { sunsetBeach } from "./scenes/sunset-beach";
+import { waterfall } from "./scenes/waterfall";
 
 /**
  * An animated background painted on the game's pixel grid. phase runs 0 to 1
@@ -1091,4 +1101,14 @@ export const EFFECTS: Effect[] = [
   moonlit,
   meadow,
   heaven,
+  sunsetBeach,
+  autumnLeaves,
+  graveyard,
+  neonRain,
+  lanterns,
+  bambooGrove,
+  rainbowSky,
+  nebula,
+  candyLand,
+  waterfall,
 ];
