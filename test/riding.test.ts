@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { LUMIVARA, planCatalog, type Cosmetics } from "../src/game/catalog";
+import { ASSETS, planCatalog, type Cosmetics } from "../src/game/catalog";
 import { NAME_FRAME_SLICES } from "../src/game/name-frames";
 import {
   FLAP_PERIOD_MS,
@@ -54,8 +54,8 @@ test("every mount in cosmetics.json comes with its sheet, cell and a seat for ea
   );
   const m = pegasus();
   assert.equal(m.name, "Meadow Pegasus");
-  assert.equal(m.sheet, `${LUMIVARA}/mounts/meadow_pegasus.png`);
-  assert.equal(m.icon, `${LUMIVARA}/items/meadow_pegasus.png`);
+  assert.equal(m.sheet, `${ASSETS}/mounts/meadow_pegasus.png`);
+  assert.equal(m.icon, `${ASSETS}/items/meadow_pegasus.png`);
   assert.deepEqual(m.cell, { w: 112, h: 118 });
   assert.deepEqual(Object.keys(m.seat), RIDING.directions);
   assert.deepEqual(m.seat.south, [55, 59]);

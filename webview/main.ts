@@ -856,7 +856,7 @@ function renderWings(): void {
           title: w.description,
           onclick: () => setWings(w.id),
         },
-        w.icon && h("img", { src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
+        w.icon && h("img", { crossOrigin: "anonymous", src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
         h("span", {}, w.name),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
       ),
@@ -908,7 +908,7 @@ function renderMounts(): void {
         "button",
         { type: "button", class: "wing", "data-mount": m.id, title: m.description, onclick: () => void setMount(m.id) },
         // A drawn mount's tile is its whole first frame, smoothed down to the tile.
-        m.icon && h("img", { src: m.icon, alt: "", width: 36, height: 36, class: m.icon.startsWith("data:") ? "smooth" : undefined }),
+        m.icon && h("img", { crossOrigin: "anonymous", src: m.icon, alt: "", width: 36, height: 36, class: m.icon.startsWith("data:") ? "smooth" : undefined }),
         h("span", {}, m.name),
       ),
     ),
@@ -1350,7 +1350,7 @@ function renderNameFrames(): void {
       h(
         "button",
         { type: "button", class: "fx", "data-name-frame": f.id, title: f.description, onclick: () => setNameFrame(f.id) },
-        f.icon ? h("img", { src: f.icon, alt: "", width: 36, height: 36 }) : h("span", { class: "fx-none", "aria-hidden": "true" }),
+        f.icon ? h("img", { crossOrigin: "anonymous", src: f.icon, alt: "", width: 36, height: 36 }) : h("span", { class: "fx-none", "aria-hidden": "true" }),
         h("span", {}, f.name),
       ),
     ),

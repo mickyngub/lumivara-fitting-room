@@ -1,0 +1,9 @@
+name = "lumivara-mirror"
+main = "worker.ts"
+compatibility_date = "2026-10-01"
+
+# Keeps a copy of every file it serves and falls back to it when Lumivara stops
+# answering. Needs R2 on the account: `npx wrangler r2 bucket create lumivara-mirror`.
+# [[r2_buckets]]
+# binding = "STORE"
+# bucket_name = "lumivara-mirror"

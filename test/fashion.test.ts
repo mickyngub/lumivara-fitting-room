@@ -7,7 +7,7 @@ import { apng, crc32, pngChunks } from "../webview/apng";
 import { layoutNameplate, nameplate, slicePieces, type NameplateLine, type Rect } from "../webview/nametag";
 import { POSES, poseAt, poseById, posesFor } from "../src/game/poses";
 import type { Look } from "../src/game/types";
-import { isCosmetics, layoutSheet, LUMIVARA, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
+import { isCosmetics, layoutSheet, ASSETS, planCatalog, type AtlasJson, type Cosmetics } from "../src/game/catalog";
 import { createWingKit } from "../src/game/wings.js";
 import { NAME_FRAME_SLICES } from "../src/game/name-frames";
 import { cleanName, NAME_MAX } from "../src/name";
@@ -72,9 +72,9 @@ test("wings take placement from cosmetics.json and their effect from the game's 
   assert.equal(demon.style.aura, codeStyles.demon_wings.aura);
   assert.equal(demon.style.far, codeStyles.demon_wings.far);
   assert.equal(demon.style.rootX, cosmetics.skins.find((s) => s.id === "demon_wings")!.wings!.rootX);
-  assert.equal(demon.textures[demon.style.texture], `${LUMIVARA}/wings/demon-wings.png`);
-  assert.equal(demon.textures[demon.style.rim!], `${LUMIVARA}/wings/demon-wings-rim.png`);
-  assert.equal(demon.info.icon, `${LUMIVARA}/items/demon_wings.png`);
+  assert.equal(demon.textures[demon.style.texture], `${ASSETS}/wings/demon-wings.png`);
+  assert.equal(demon.textures[demon.style.rim!], `${ASSETS}/wings/demon-wings-rim.png`);
+  assert.equal(demon.info.icon, `${ASSETS}/items/demon_wings.png`);
   assert.deepEqual(plan.wingsWithoutEffect, []);
 });
 
@@ -113,9 +113,9 @@ test("name frames take their art from cosmetics.json and their slices from the g
   assert.deepEqual(plan.nameFrames.map((f) => f.id), listed);
   const star = nameFrame("celestial_star");
   assert.equal(star.name, "Celestial Star");
-  assert.equal(star.url, `${LUMIVARA}/name-frames/celestial_star.png`);
-  assert.equal(star.gemUrl, `${LUMIVARA}/name-frames/celestial_star-gem.png`);
-  assert.equal(star.icon, `${LUMIVARA}/items/celestial_star.png`);
+  assert.equal(star.url, `${ASSETS}/name-frames/celestial_star.png`);
+  assert.equal(star.gemUrl, `${ASSETS}/name-frames/celestial_star-gem.png`);
+  assert.equal(star.icon, `${ASSETS}/items/celestial_star.png`);
   assert.deepEqual(star.slice, [13, 54, 17, 54]);
   assert.deepEqual(star.width, [13, 54, 17, 54]);
   assert.deepEqual(plan.nameFramesWithoutSlices, []);

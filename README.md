@@ -17,7 +17,7 @@
 9. เลือกพื้นหลัง (สีพื้น หรือฉากพิกเซลที่ขยับได้ 15 แบบ เช่น ออโรร่า ซากุระ หิมะ ลาวา ใต้น้ำ และทุ่งหญ้า) และกรอบการ์ด 16 แบบ เช่น ซากุระ น้ำแข็ง นีออน ดวงดาว และสายฟ้า
 10. กด ✦ วางลงบอร์ด การ์ดจะขยับวนได้เหมือนในเกม วางได้หลายใบ แล้วกด “แชร์” เพื่อส่งลิงก์ให้เพื่อน
 
-ชื่อ พื้นหลัง กรอบการ์ด และปีกจากรูปของคุณทุกแบบจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร ปีก สัตว์ขี่ และกรอบชื่อโหลดสดจาก lumivaraonline.com ทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
+ชื่อ พื้นหลัง กรอบการ์ด และปีกจากรูปของคุณทุกแบบจะถูกจำไว้ในเบราว์เซอร์นี้ ครั้งหน้าไม่ต้องตั้งใหม่ รายการชุด ภาพตัวละคร ปีก สัตว์ขี่ และกรอบชื่อโหลดสดจากเกม Lumivara ผ่านเซิร์ฟเวอร์ของห้องแต่งตัวทุกครั้งที่เปิด ชุดใหม่ในเกมจึงขึ้นเองโดยไม่ต้องอัปเดตส่วนขยาย
 
 ## In English
 
@@ -41,11 +41,11 @@ Try every Lumivara Online outfit, wing, mount and name frame on your own charact
 | Canvas | placing character cards on your board |
 | Local storage | remembering your name, background, frame and your own wings in this browser |
 
-The extension sends nothing anywhere. It only downloads the game's public fashion data and art from `lumivaraonline.com`.
+The extension sends nothing anywhere. It only downloads the game's fashion data and art, from `lumivaraonline.com` through the fitting room's own mirror.
 
 ## How it works
 
-- Nothing about the fashion is bundled. Each time the panel opens it reads the game's `https://lumivaraonline.com/cosmetics.json` (classes, outfits, wings, mounts and name frames with names, icons, art paths, wing placement and mount seats) and builds each look's sprite sheet in the browser from the game's own atlases: idle, walk and every action pose the atlas has, in all eight directions. Lumivara serves these files with `Access-Control-Allow-Origin: *`, which the sandboxed panel (origin `null`) needs; mount sheets under `/mounts/` need it too, and until the game sends it there, picking a mount says its sheet could not be loaded. If the game cannot be reached the panel says so and offers a retry.
+- Nothing about the fashion is bundled. Each time the panel opens it reads the game's `cosmetics.json` (classes, outfits, wings, mounts and name frames with names, icons, art paths, wing placement and mount seats) and builds each look's sprite sheet in the browser from the game's own atlases: idle, walk and every action pose the atlas has, in all eight directions. Lumivara lets no other site use its images, so with Lumivara's permission the panel reads everything through the fitting room's own Cloudflare Worker (`mirror/`): it fetches each file from lumivaraonline.com, keeps a copy when given an R2 bucket, and serves it only to Drawdy's sandboxed panel and extension code, whose requests carry `Origin: null`, refusing a game on its own site. If the game cannot be reached the panel says so and offers a retry.
 - Characters are drawn with the game's own engine, Phaser 3.90, at native game resolution with the game's `pixelArt` and `roundPixels` settings, then scaled up, so they match the game pixel for pixel.
 - Wings move with the game's own wing code (`src/game/wings.js`, lifted from the game client by `scripts/wing-code.mjs`); placement comes from `cosmetics.json`.
 - Mounts are drawn the way the game's `drawRiding` draws them (`src/game/riding.ts`): one sheet row per direction, the west side mirrored, the rider on the last frame of its sit pose its feet on the mount's seat for that direction and its head over the seat (the game centres the frame there, which leaves a body drawn off-centre, like the Swordman's, beside the saddle), the mount standing on a wider shadow (the game floats it 18 px higher) and bobbing, and the wings lowered. The seats and sheets come from `cosmetics.json`; the game's riding code and the numbers it reads are copied into `src/game/riding.game.js` by `scripts/riding-code.mjs`, which is not bundled and only shows what changed after a game update. A rider stands about twice as tall, so a mounted scene is drawn at the game's resolution over twice the area and shown at half the zoom, the feet, background and name tag where they were. A mounted card loops on whole rounds of the mount's frames, with every other frame: 9 frames standing still and 6 moving. The fitting room's own eight mounts are pixel art drawn in code (`src/art/mounts/`), each painted into a sheet laid out like the game's (`paintSheet` in `src/art/mounts.ts`) when the panel opens, so they need nothing from the game's site.
@@ -58,7 +58,7 @@ The extension sends nothing anywhere. It only downloads the game's public fashio
 
 ## Credits
 
-Characters, outfits, wings, mounts and their animation are from [Lumivara Online](https://lumivaraonline.com) and load live from the game's site. Rendering uses [Phaser](https://phaser.io) 3.90 (MIT).
+Characters, outfits, wings, mounts and their animation are from [Lumivara Online](https://lumivaraonline.com) and load live from the game's site through the mirror. Rendering uses [Phaser](https://phaser.io) 3.90 (MIT).
 
 ## Licence
 
@@ -77,8 +77,10 @@ npm run check-name-frames  # are the bundled name frame slices still the game's?
 npm run name-frames        # lift them again after a game update
 npm run check-riding       # is the game's riding code still the one src/game/riding.ts follows?
 npm run riding-code        # copy it again after a game update, then follow the diff in src/game/riding.ts
-npm run preflight          # before submitting: committed, built, pushed, under Drawdy's limits, above the live version
+npm run preflight          # before submitting: committed, built, pushed, under Drawdy's limits, above the live version, mirror up
 ```
+
+The mirror in `mirror/` is a Cloudflare Worker. `cd mirror && npx wrangler deploy` publishes it; set `ASSETS` in `src/game/catalog.ts` to the URL it prints, and `npm run preflight` refuses a release until that URL serves the panel and refuses other sites. `npx wrangler dev` runs it on `:8787` for a local test. For a copy that outlives Lumivara refusing the Worker, create an R2 bucket (`npx wrangler r2 bucket create lumivara-mirror`) and uncomment its binding in `mirror/wrangler.toml`.
 
 Drawdy builds published versions from this repository's `src/index.ts`, so commit `src/webview-html.ts` after `npm run build`. Bump `driverVersion` in `manifest.json` for every release and add it to `CHANGELOG.md`. `npm test` holds the manifest and listing files to Drawdy's submission rules (a description of at most 500 characters, an icon of at most 256 KB, only `@drawdy/driver-protocol` imported from outside the repository).
 

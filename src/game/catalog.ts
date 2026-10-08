@@ -1,8 +1,11 @@
 import { RIDING } from "./riding";
 import type { Look, Mount, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
 
-export const LUMIVARA = "https://lumivaraonline.com";
-export const COSMETICS_URL = `${LUMIVARA}/cosmetics.json`;
+// Lumivara's cosmetics and art, through the fitting room's own Worker (mirror/):
+// Lumivara lets no other site use its images directly. Set this to the deployed
+// Worker's URL; preflight refuses a release until it answers.
+export const ASSETS = "https://lumivara-mirror.your-subdomain.workers.dev";
+export const COSMETICS_URL = `${ASSETS}/cosmetics.json`;
 const COSMETICS_FORMAT = 1;
 // Tint for the far wing of a wing the bundled wing code has never seen.
 const DEFAULT_FAR = 0xb8b8b8;
@@ -60,7 +63,7 @@ export type CatalogPlan = {
   mounts: Mount[];
 };
 
-export const absolute = (path: string) => new URL(path, LUMIVARA).href;
+export const absolute = (path: string) => new URL(path, ASSETS).href;
 
 const isPoint = (v: unknown): v is [number, number] =>
   Array.isArray(v) && v.length === 2 && v.every((n) => Number.isFinite(n));
