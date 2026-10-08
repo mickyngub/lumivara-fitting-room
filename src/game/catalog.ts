@@ -4,7 +4,7 @@ import type { Look, Mount, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo
 // Lumivara's cosmetics and art, from the fitting room's own copy (mirror/):
 // Lumivara lets no other site use its images directly. Set this to the deployed
 // mirror's URL; preflight refuses a release until it serves the panel.
-export const ASSETS = "https://lumivara-mirror.your-subdomain.workers.dev";
+export const ASSETS = "https://lumivara-mirror.micky47561.workers.dev";
 export const COSMETICS_URL = `${ASSETS}/cosmetics.json`;
 const COSMETICS_FORMAT = 1;
 // Tint for the far wing of a wing the bundled wing code has never seen.
