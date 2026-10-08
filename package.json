@@ -13,6 +13,7 @@
         "riding-code": "node scripts/riding-code.mjs",
         "check-riding": "node scripts/riding-code.mjs --check",
         "preflight": "node scripts/preflight.mjs",
+    "mirror": "node mirror/sync.ts && npx -y wrangler@4 deploy --config mirror/wrangler.toml",
         "dev": "vite",
         "build": "node build.ts",
         "test": "tsx --test test/*.test.ts",

@@ -1,159 +1,165 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { handle, type Context, type Store } from "../mirror/worker";
+import { artPaths, sync } from "../mirror/sync";
 
-const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const COSMETICS = {
+  format: 1,
+  build: "b1",
+  classes: [
+    {
+      id: "novice",
+      atlas: { png: "/novice-v6/player.png", json: "/novice-v6/player.json" },
+    },
+  ],
+  skins: [
+    {
+      id: "demon_wings",
+      icon: "/items/demon_wings.png",
+      description: "ปีกปีศาจ / not a path.png",
+      wings: {
+        url: "/wings/demon-wings.png",
+        rimUrl: "/wings/demon-wings-rim.png",
+        rootX: 1,
+      },
+    },
+    {
+      id: "star",
+      nameFrame: {
+        url: "/name-frames/star.png",
+        gemUrl: "/name-frames/star-gem.png",
+      },
+    },
+    {
+      id: "pegasus",
+      mount: { sheet: "/mounts/meadow_pegasus.png", cell: [112, 118] },
+    },
+    {
+      id: "odd",
+      icon: "https://other.example/x.png",
+      extra: ["/../secret.png", "/assets/main.js", "/./x.png"],
+    },
+  ],
+};
+const FILES = artPaths(COSMETICS);
 
-const request = (path: string, headers: Record<string, string> = {}) =>
-  new Request(`https://lumivara-mirror.test${path}`, { headers });
-const fromPanel = (path: string, headers: Record<string, string> = {}) =>
-  request(path, { origin: "null", ...headers });
-
-function lumivara(
-  respond: (init?: RequestInit) => Response | Promise<Response>,
-) {
-  const asked: { url: string; init?: RequestInit }[] = [];
-  const upstream = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    asked.push({ url: String(input), init });
-    return respond(init);
+function lumivara(files: Record<string, number | string>) {
+  return (async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname;
+    if (path === "/cosmetics.json")
+      return new Response(JSON.stringify(COSMETICS));
+    const file = files[path];
+    if (typeof file === "number") return new Response(null, { status: file });
+    return new Response(file ?? `art of ${path}`);
   }) as typeof fetch;
-  return { asked, upstream };
 }
 
-function context() {
-  const pending: Promise<unknown>[] = [];
-  const ctx: Context = { waitUntil: (p) => void pending.push(p) };
-  return { ctx, settled: () => Promise.all(pending) };
+async function inMirror(run: (dir: string) => Promise<void>) {
+  const dir = await mkdtemp(join(tmpdir(), "lumivara-mirror-"));
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "_headers"),
+      "/*\n  Access-Control-Allow-Origin: null\n",
+    );
+    await run(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
-function memoryStore(): Store & { keys(): string[] } {
-  const kept = new Map<string, { bytes: ArrayBuffer; contentType: string }>();
-  return {
-    async get(key) {
-      const k = kept.get(key);
-      return k
-        ? {
-            body: new Response(k.bytes).body!,
-            httpMetadata: { contentType: k.contentType },
-          }
-        : null;
-    },
-    async put(key, value, options) {
-      kept.set(key, {
-        bytes: value,
-        contentType: options.httpMetadata.contentType,
-      });
-    },
-    keys: () => [...kept.keys()],
-  };
+async function put(dir: string, path: string, text: string) {
+  await mkdir(dirname(join(dir, path)), { recursive: true });
+  await writeFile(join(dir, path), text);
 }
 
-const png = () =>
-  new Response(PNG, {
-    headers: { "content-type": "image/png", etag: '"abc"' },
+test("finds every file cosmetics.json mentions, wherever it sits, and nothing off the site", () => {
+  assert.deepEqual(FILES, [
+    "/items/demon_wings.png",
+    "/mounts/meadow_pegasus.png",
+    "/name-frames/star-gem.png",
+    "/name-frames/star.png",
+    "/novice-v6/player.json",
+    "/novice-v6/player.png",
+    "/wings/demon-wings-rim.png",
+    "/wings/demon-wings.png",
+  ]);
+});
+
+test("copies every file, drops what Lumivara no longer mentions, and keeps _headers", async () => {
+  await inMirror(async (dir) => {
+    await put(dir, "/mounts/retired.png", "old");
+    await put(dir, "/items/demon_wings.png", "art of /items/demon_wings.png");
+    const r = await sync(dir, lumivara({}));
+    assert.deepEqual(r, {
+      files: FILES.length + 1,
+      written: FILES.length - 1,
+      removed: 1,
+      missing: [],
+    });
+    for (const path of FILES)
+      assert.equal(await readFile(join(dir, path), "utf8"), `art of ${path}`);
+    assert.equal(existsSync(join(dir, "mounts", "retired.png")), false);
+    assert.match(
+      await readFile(join(dir, "_headers"), "utf8"),
+      /Access-Control-Allow-Origin: null/,
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(join(dir, "cosmetics.json"), "utf8")),
+      COSMETICS,
+    );
   });
+});
 
-test("refuses a game on its own site, and anything sent with no origin, without asking Lumivara", async () => {
-  const { asked, upstream } = lumivara(png);
-  const sites: Record<string, string>[] = [{ origin: "https://copycat.example" }, {}];
-  for (const headers of sites) {
-    const res = await handle(
-      request("/mounts/meadow_pegasus.png", headers),
-      {},
-      context().ctx,
-      upstream,
+test("leaves the copy as it was when Lumivara fails partway", async () => {
+  await inMirror(async (dir) => {
+    await put(dir, "/cosmetics.json", "previous");
+    await put(dir, "/mounts/retired.png", "old");
+    await assert.rejects(
+      sync(dir, lumivara({ "/wings/demon-wings.png": 503 })),
+      /demon-wings\.png: HTTP 503/,
     );
-    assert.equal(res.status, 403);
-    assert.equal(res.headers.get("access-control-allow-origin"), null);
-  }
-  assert.deepEqual(asked, []);
-});
-
-test("serves Drawdy's sandboxed panel Lumivara's art with CORS, whatever query it adds", async () => {
-  const { asked, upstream } = lumivara(png);
-  const res = await handle(
-    fromPanel("/mounts/meadow_pegasus.png?v=2"),
-    {},
-    context().ctx,
-    upstream,
-  );
-  assert.deepEqual(
-    asked.map((a) => a.url),
-    ["https://lumivaraonline.com/mounts/meadow_pegasus.png"],
-  );
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("access-control-allow-origin"), "*");
-  assert.equal(res.headers.get("vary"), "Origin");
-  assert.equal(res.headers.get("content-type"), "image/png");
-  assert.deepEqual(new Uint8Array(await res.arrayBuffer()), PNG);
-});
-
-test("serves only the game's art and data, not its pages or code", async () => {
-  const { asked, upstream } = lumivara(png);
-  for (const path of [
-    "/",
-    "/play",
-    "/assets/main-h8slX4rf.js",
-    "/cosmetics.json/",
-  ]) {
-    const res = await handle(fromPanel(path), {}, context().ctx, upstream);
-    assert.equal(res.status, 404, path);
-  }
-  assert.deepEqual(asked, []);
-});
-
-test("passes a revalidation through, so an unchanged file comes back as 304", async () => {
-  const { asked, upstream } = lumivara(
-    () => new Response(null, { status: 304 }),
-  );
-  const res = await handle(
-    fromPanel("/cosmetics.json", { "if-none-match": '"abc"' }),
-    {},
-    context().ctx,
-    upstream,
-  );
-  assert.equal(
-    new Headers(asked[0].init?.headers).get("if-none-match"),
-    '"abc"',
-  );
-  assert.equal(res.status, 304);
-  assert.equal(res.headers.get("access-control-allow-origin"), "*");
-});
-
-test("keeps what it serves and falls back to it when Lumivara stops answering", async () => {
-  const store = memoryStore();
-  const first = context();
-  await handle(
-    fromPanel("/mounts/meadow_pegasus.png"),
-    { STORE: store },
-    first.ctx,
-    lumivara(png).upstream,
-  );
-  await first.settled();
-  assert.deepEqual(store.keys(), ["/mounts/meadow_pegasus.png"]);
-
-  for (const down of [
-    lumivara(() => Promise.reject(new TypeError("fetch failed"))).upstream,
-    lumivara(() => new Response(null, { status: 403 })).upstream,
-  ]) {
-    const res = await handle(
-      fromPanel("/mounts/meadow_pegasus.png"),
-      { STORE: store },
-      context().ctx,
-      down,
+    assert.equal(
+      await readFile(join(dir, "cosmetics.json"), "utf8"),
+      "previous",
     );
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get("access-control-allow-origin"), "*");
-    assert.equal(res.headers.get("content-type"), "image/png");
-    assert.deepEqual(new Uint8Array(await res.arrayBuffer()), PNG);
-  }
+    assert.equal(existsSync(join(dir, "mounts", "retired.png")), true);
+  });
+});
 
-  const missing = await handle(
-    fromPanel("/mounts/skytide_manta.png"),
-    { STORE: store },
-    context().ctx,
-    lumivara(() => new Response(null, { status: 503 })).upstream,
+test("keeps the last copy of a file Lumivara has lost, and copies the rest", async () => {
+  await inMirror(async (dir) => {
+    await put(dir, "/mounts/meadow_pegasus.png", "last copy");
+    const r = await sync(
+      dir,
+      lumivara({
+        "/mounts/meadow_pegasus.png": 404,
+        "/items/demon_wings.png": 404,
+      }),
+    );
+    assert.deepEqual(r.missing, [
+      "/items/demon_wings.png",
+      "/mounts/meadow_pegasus.png",
+    ]);
+    assert.equal(
+      await readFile(join(dir, "mounts", "meadow_pegasus.png"), "utf8"),
+      "last copy",
+    );
+    assert.equal(
+      await readFile(join(dir, "wings", "demon-wings.png"), "utf8"),
+      "art of /wings/demon-wings.png",
+    );
+  });
+});
+
+test("the deployed copy lets only sandboxed pages, like Drawdy's panel, use the art", async () => {
+  const headers = await readFile(
+    new URL("../mirror/public/_headers", import.meta.url),
+    "utf8",
   );
-  assert.equal(missing.status, 503);
-  assert.equal(missing.headers.get("access-control-allow-origin"), "*");
+  assert.match(headers, /^\/\*\n {2}Access-Control-Allow-Origin: null$/m);
+  assert.doesNotMatch(headers, /Access-Control-Allow-Origin: \*/);
 });

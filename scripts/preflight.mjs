@@ -36,8 +36,8 @@ if (!res.ok && res.status !== 404) throw new Error(`Drawdy catalog: HTTP ${res.s
 const live = res.ok ? (await res.json()).entry : null;
 if (live && !newer(manifest.driverVersion, live.version)) problems.push(`driverVersion ${manifest.driverVersion} is not above the live ${live.version}; bump it in manifest.json and CHANGELOG.md.`);
 
-// The panel reads everything through the Worker in mirror/, so a release needs it
-// deployed, answering the sandboxed panel and refusing every other site.
+// The panel reads everything from the copy in mirror/, so a release needs it
+// deployed and letting the sandboxed panel (origin null), and no other site, use the art.
 const assets = readFileSync(join(ROOT, "src", "game", "catalog.ts"), "utf8").match(/export const ASSETS = "([^"]+)"/)?.[1];
 const asOrigin = (origin) =>
     fetch(`${assets}/cosmetics.json`, { headers: { origin } }).then(
@@ -47,9 +47,10 @@ const asOrigin = (origin) =>
 if (!assets) problems.push("No ASSETS URL in src/game/catalog.ts.");
 else {
     const [panel, other] = await Promise.all([asOrigin("null"), asOrigin("https://example.com")]);
-    if (panel.status !== 200 || !panel.cors)
-        problems.push(`The mirror at ${assets} does not serve the panel (${panel.error ?? `HTTP ${panel.status}`}); deploy mirror/ and set ASSETS to its URL.`);
-    else if (other.status !== 403) problems.push(`The mirror at ${assets} answers other sites (HTTP ${other.status}); it must refuse them.`);
+    if (panel.status !== 200 || panel.cors !== "null")
+        problems.push(`The mirror at ${assets} does not serve the panel (${panel.error ?? `HTTP ${panel.status}, Access-Control-Allow-Origin ${panel.cors}`}); deploy mirror/ and set ASSETS to its URL.`);
+    else if (other.cors === "*" || other.cors === "https://example.com")
+        problems.push(`The mirror at ${assets} lets other sites use the art (Access-Control-Allow-Origin ${other.cors}); it must allow only null.`);
 }
 
 console.log(`${manifest.driverId} ${manifest.driverVersion} at ${head.slice(0, 7)} · bundle ${(bundle / 1024).toFixed(0)} KB`);

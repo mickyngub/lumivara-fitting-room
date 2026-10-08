@@ -1,9 +1,9 @@
 import { RIDING } from "./riding";
 import type { Look, Mount, NameFrame, NameFrameSlices, Sheet, SheetRow, WingInfo, WingStyle } from "./types";
 
-// Lumivara's cosmetics and art, through the fitting room's own Worker (mirror/):
+// Lumivara's cosmetics and art, from the fitting room's own copy (mirror/):
 // Lumivara lets no other site use its images directly. Set this to the deployed
-// Worker's URL; preflight refuses a release until it answers.
+// mirror's URL; preflight refuses a release until it serves the panel.
 export const ASSETS = "https://lumivara-mirror.your-subdomain.workers.dev";
 export const COSMETICS_URL = `${ASSETS}/cosmetics.json`;
 const COSMETICS_FORMAT = 1;

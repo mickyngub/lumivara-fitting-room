@@ -1,3 +1,6 @@
 node_modules/
 dist/
 .wrangler/
+# Lumivara's art: copied in by mirror/sync.ts and deployed, never committed to this public repo.
+mirror/public/*
+!mirror/public/_headers
