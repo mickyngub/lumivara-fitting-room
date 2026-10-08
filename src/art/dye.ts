@@ -166,6 +166,10 @@ const skinTone = (c: Hsl, r: number, g: number, b: number) =>
 // inside the head a warm colour is never dyed; a cool hat or hood still is.
 const warm = (c: Hsl) => (c.h <= 50 || c.h >= 330) && c.s >= CLOTH.fade;
 const MAX_PARTS = 3;
+/** Where a look's dyes keep the tint for its grey clothes, after its colour parts. */
+export const GREY_DYE = MAX_PARTS;
+// Greys this light (blades, metal, white cloth) keep their colour, easing in below it.
+const GREY = { full: 0.55, none: 0.75 };
 // A hue family needs this share of the clothes to be a part of its own.
 const MIN_PART_SHARE = 0.08;
 
@@ -235,8 +239,8 @@ export function skinColours(data: Uint8ClampedArray, width: number, sheet: Layou
   return new Set([...face].filter(([c, n]) => n >= 3 && n >= FACE_TO_BODY * (body.get(c) ?? 0)).map(([c]) => c));
 }
 
-/** The hue families a sheet's clothes are in, largest first, or null when it has none to dye. */
-export function clothParts(data: Uint8ClampedArray, width: number, sheet: Layout, heads: Head[][]): Cloth | null {
+/** The hue families a sheet's clothes are in, largest first, and its skin colours. */
+export function clothParts(data: Uint8ClampedArray, width: number, sheet: Layout, heads: Head[][]): Cloth {
   const skin = skinColours(data, width, sheet, heads);
   const hsl = new Map<number, Hsl>();
   const counts = new Map<number, number>();
@@ -271,13 +275,15 @@ export function clothParts(data: Uint8ClampedArray, width: number, sheet: Layout
     // Its fading edge belongs to it too, so the next part is a hue of its own.
     left = left.filter(({ c }) => hueGap(c.h, part.h) > FAMILY.edge);
   }
-  return parts.length ? { parts, skin } : null;
+  return { parts, skin };
 }
 
 /**
  * Dyes each part's clothes onto its target, or leaves the part as drawn where
- * it has none. A colour belongs to the part nearest it in hue; skin, greys,
- * outlines, warm colours in the head and hues far from every part keep theirs.
+ * it has none. A colour belongs to the part nearest it in hue; skin, outlines,
+ * warm colours in the head and hues far from every part keep theirs. Greys
+ * keep theirs too, unless a grey tint is given: then grey clothes below the
+ * head take its hue and saturation and keep their own lightness.
  */
 export function dyeCloth(
   data: Uint8ClampedArray,
@@ -286,21 +292,29 @@ export function dyeCloth(
   heads: Head[][],
   cloth: Cloth,
   targets: (Hsl | null)[],
+  grey: Hsl | null = null,
 ): void {
   const done = [new Map<number, number>(), new Map<number, number>()];
   const dyed = (key: number, inHead: boolean): number => {
     const [r, g, b] = [key >> 16, (key >> 8) & 255, key & 255];
     const c = rgbToHsl(r, g, b);
     if (!dyeable(c, key, inHead, cloth.skin)) return key;
+    const coloured = clamp01((c.s - CLOTH.fade) / (CLOTH.s - CLOTH.fade));
+    let [R, G, B] = [r, g, b];
     const gaps = cloth.parts.map((p) => hueGap(c.h, p.h));
     const k = gaps.indexOf(Math.min(...gaps));
     const target = targets[k];
-    const w =
-      clamp01((c.s - CLOTH.fade) / (CLOTH.s - CLOTH.fade)) *
-      (gaps[k] <= FAMILY.core ? 1 : clamp01(1 - (gaps[k] - FAMILY.core) / (FAMILY.edge - FAMILY.core)));
-    if (!target || w <= 0) return key;
-    const [R, G, B] = hslToRgb(dyeHsl(c, cloth.parts[k], target));
-    return pack(Math.round(r + (R - r) * w), Math.round(g + (G - g) * w), Math.round(b + (B - b) * w));
+    const w = coloured * (gaps[k] <= FAMILY.core ? 1 : clamp01(1 - (gaps[k] - FAMILY.core) / (FAMILY.edge - FAMILY.core)));
+    if (target && w > 0) {
+      const [dr, dg, db] = hslToRgb(dyeHsl(c, cloth.parts[k], target));
+      [R, G, B] = [R + (dr - R) * w, G + (dg - G) * w, B + (db - B) * w];
+    }
+    const t = grey && !inHead ? (1 - coloured) * clamp01((GREY.none - c.l) / (GREY.none - GREY.full)) : 0;
+    if (grey && t > 0) {
+      const [tr, tg, tb] = hslToRgb({ h: grey.h, s: grey.s, l: c.l });
+      [R, G, B] = [R + (tr - R) * t, G + (tg - G) * t, B + (tb - B) * t];
+    }
+    return pack(Math.round(R), Math.round(G), Math.round(B));
   };
   eachPixel(data, width, sheet, heads, (i, inHead) => {
     const key = pack(data[i], data[i + 1], data[i + 2]);

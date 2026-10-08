@@ -1,7 +1,7 @@
 /// <reference types="phaser" />
 import { createWingKit } from "../src/game/wings.js";
 import { FLAP_PERIOD_MS } from "../src/game/poses";
-import { clothParts, dyeCloth, dyePixels, dyeRgb, dyeShades, hexToHsl, mainColour, type Cloth, type Hsl } from "../src/art/dye";
+import { clothParts, dyeCloth, dyePixels, dyeRgb, dyeShades, GREY_DYE, hexToHsl, mainColour, type Cloth, type Hsl } from "../src/art/dye";
 import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
 import { pixels } from "../src/art/pixels";
 import { findHeads, type Head } from "../src/game/head";
@@ -25,6 +25,7 @@ const DYED_LOOKS_KEPT = 3;
 const MOUNTED_ZOOM_OUT = 2;
 const mountKey = (id: string) => `mount:${id}`;
 const targetsOf = (cloth: Cloth, dyes: (string | null)[]): (Hsl | null)[] => cloth.parts.map((_, k) => (dyes[k] ? hexToHsl(dyes[k]!) : null));
+const greyOf = (dyes: (string | null)[]): Hsl | null => (dyes[GREY_DYE] ? hexToHsl(dyes[GREY_DYE]!) : null);
 
 const kit = createWingKit(Phaser);
 export const DIRECTIONS: string[] = kit.directions;
@@ -119,7 +120,7 @@ export class Stage {
   private wingsId: string | null = null;
   private dye: string | null = null;
   private readonly mainColours = new Map<string, Hsl>();
-  private readonly cloth = new Map<string, Cloth | null>();
+  private readonly cloth = new Map<string, Cloth>();
   private readonly dyedLooks: string[] = [];
   private dyedFrames = new Map<string, string>();
   private override: Scene | null = null;
@@ -383,7 +384,7 @@ export class Stage {
     for (const swirl of parts.swirls) swirl.setTexture(this.dyedTexture(swirl.texture.key, dye, main));
   }
 
-  private clothOf(look: Look): Cloth | null {
+  private clothOf(look: Look): Cloth {
     let cloth = this.cloth.get(look.id);
     if (cloth === undefined) {
       const { canvas, image } = this.sourcePixels(look.id);
@@ -394,17 +395,17 @@ export class Stage {
 
   /** The colour parts of a look's clothes, largest first; none before the stage has booted. */
   partsOf(look: Look): Hsl[] {
-    return this.textures ? (this.clothOf(look)?.parts ?? []) : [];
+    return this.textures ? this.clothOf(look).parts : [];
   }
 
-  /** The look's sheet with its clothes' parts dyed, framed like the game's sprite sheet. */
+  /** The look's sheet with its clothes' parts and greys dyed, framed like the game's sprite sheet. */
   private lookTexture(look: Look, dyes: (string | null)[]): string {
-    const cloth = dyes.some(Boolean) ? this.clothOf(look) : null;
-    if (!cloth) return look.id;
+    if (!dyes.some(Boolean)) return look.id;
+    const cloth = this.clothOf(look);
     const key = `${look.id}~${dyes.join(",")}`;
     if (this.textures.exists(key)) return key;
     const { canvas, ctx, image } = this.sourcePixels(look.id);
-    dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes));
+    dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes), greyOf(dyes));
     ctx.putImageData(image, 0, 0);
     const texture = this.textures.addCanvas(key, canvas)!;
     const { w, h } = look.sheet.cell;
@@ -422,9 +423,9 @@ export class Stage {
     const cached = this.dyedFrames.get(key);
     if (cached) return cached;
     const { canvas, ctx, image } = this.sourcePixels(look.id);
-    const cloth = dyes.some(Boolean) ? this.clothOf(look) : null;
-    if (cloth) {
-      dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes));
+    if (dyes.some(Boolean)) {
+      const cloth = this.clothOf(look);
+      dyeCloth(image.data, canvas.width, look.sheet, this.headsOf(look), cloth, targetsOf(cloth, dyes), greyOf(dyes));
       ctx.putImageData(image, 0, 0);
     }
     const { w, h } = look.sheet.cell;

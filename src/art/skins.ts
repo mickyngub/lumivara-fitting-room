@@ -9,6 +9,8 @@ export type ClassSkin = {
   name: string;
   description: string;
   dyes: [main: string, second: string, third: string];
+  /** A tint for clothes drawn in grey, which the dyes leave as drawn, such as the Kensei's. */
+  greys?: string;
 };
 
 export const CLASS_SKINS: ClassSkin[] = [

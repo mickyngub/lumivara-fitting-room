@@ -144,6 +144,9 @@ const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? 
 const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
 const skin = (): ClassSkin | undefined => (outfitId ? undefined : CLASS_SKINS.find((s) => s.id === skinId && s.classId === classId));
 const skinsOf = (id: string) => CLASS_SKINS.filter((s) => s.classId === id);
+const skinDyes = (s: ClassSkin) => [...s.dyes, s.greys ?? null];
+// Marks the fitting room's own items in the rows that also hold the game's.
+const ownMark = () => h("i", { class: "own-mark", title: "ของห้องแต่งตัว ไม่มีในเกม", "aria-hidden": "true" }, "✦");
 // A skin is the plain look under colours of its own, kept apart from the plain look's.
 const dyeKey = (l: Look): string => {
   const s = skin();
@@ -289,9 +292,10 @@ function skinTile(s: ClassSkin): HTMLElement {
   const tile = h(
     "button",
     { type: "button", class: "look", title: s.name, "aria-pressed": String(skin()?.id === s.id), onclick: () => chooseSkin(s) },
-    thumb(plain, 56, live?.dyedFrame(plain, s.dyes, thumbRowOf(plain), 0) ?? undefined),
+    thumb(plain, 56, live?.dyedFrame(plain, skinDyes(s), thumbRowOf(plain), 0) ?? undefined),
     h("span", { class: "look-name" }, s.name),
     h("em", {}, "สกิน"),
+    ownMark(),
   );
   tile.dataset.look = `skin:${s.id}`;
   return tile;
@@ -300,7 +304,7 @@ function skinTile(s: ClassSkin): HTMLElement {
 function chooseSkin(s: ClassSkin): void {
   outfitId = null;
   skinId = s.id;
-  if (!lookDyes.has(`skin:${s.id}`)) lookDyes.set(`skin:${s.id}`, [...s.dyes]);
+  if (!lookDyes.has(`skin:${s.id}`)) lookDyes.set(`skin:${s.id}`, skinDyes(s));
   renderPickers();
 }
 
@@ -892,6 +896,7 @@ function renderWings(): void {
         w.icon && h("img", { crossOrigin: "anonymous", src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
         h("span", {}, w.name),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
+        w.id.startsWith("own-") && ownMark(),
       ),
     ),
     ...savedWings.map((saved) => {
@@ -943,6 +948,7 @@ function renderMounts(): void {
         // A drawn mount's tile is its whole first frame, smoothed down to the tile.
         m.icon && h("img", { crossOrigin: "anonymous", src: m.icon, alt: "", width: 36, height: 36, class: m.icon.startsWith("data:") ? "smooth" : undefined }),
         h("span", {}, m.name),
+        m.id.startsWith("own-") && ownMark(),
       ),
     ),
   );

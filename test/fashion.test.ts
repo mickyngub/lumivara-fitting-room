@@ -507,7 +507,7 @@ const hueAt = (pixel: number[]) => rgbToHsl(pixel[0], pixel[1], pixel[2]).h;
 
 test("an outfit's clothes split into colour parts, each dyed on its own, while the face, greys and outline stay as drawn", () => {
   const { data, sheet, heads, at } = tunicSheet();
-  const cloth = clothParts(data, 12, sheet, heads)!;
+  const cloth = clothParts(data, 12, sheet, heads);
   assert.deepEqual(cloth.parts.map((p) => Math.round(p.h)), [Math.round(hueAt(at(4, 8))), Math.round(hueAt(at(4, 15)))], "the tunic and the trim are not its parts");
   const before = { face: at(5, 2), belt: at(4, 11), trim: at(4, 15), outline: at(4, 16) };
   dyeCloth(data, 12, sheet, heads, cloth, [hexToHsl("#38b6f2"), null]);
@@ -522,16 +522,29 @@ test("an outfit's clothes split into colour parts, each dyed on its own, while t
 test("a warm colour inside the head keeps its colour even where the same colour is dyed on the body", () => {
   const { data, sheet, heads, at } = tunicSheet("#7a4a28");
   const hair = at(5, 0);
-  const cloth = clothParts(data, 12, sheet, heads)!;
+  const cloth = clothParts(data, 12, sheet, heads);
   dyeCloth(data, 12, sheet, heads, cloth, [hexToHsl("#38b6f2"), null]);
   assert.deepEqual(at(5, 0), hair, "hair the colour of the tunic was dyed with it");
   assert.ok(Math.abs(hueAt(at(4, 8)) - 199) < 5, "the tunic was not dyed blue");
 });
 
-test("a look with no coloured clothes has nothing to dye", () => {
+test("a look with no coloured clothes has no colour parts to dye", () => {
   const sheet = { cell: { w: 4, h: 4 }, baseline: 4, rows: [{ anim: "idle", dir: "south", count: 1 }] };
   const grey = new Uint8ClampedArray(4 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : 128));
-  assert.equal(clothParts(grey, 4, sheet, findHeads(grey, 4, sheet, () => 2)), null);
+  assert.deepEqual(clothParts(grey, 4, sheet, findHeads(grey, 4, sheet, () => 2)).parts, []);
+});
+
+test("a grey tint colours grey clothes below the head and keeps their lightness, leaving grey hair, coloured clothes and the outline", () => {
+  const { data, sheet, heads, at } = tunicSheet("#505050");
+  const cloth = clothParts(data, 12, sheet, heads);
+  const before = { hair: at(5, 0), tunic: at(4, 8), trim: at(4, 15), outline: at(4, 16) };
+  const belt = rgbToHsl(...(at(4, 11) as [number, number, number]));
+  const tint = hexToHsl("#3060c0");
+  dyeCloth(data, 12, sheet, heads, cloth, [null, null], tint);
+  const tinted = rgbToHsl(...(at(4, 11) as [number, number, number]));
+  assert.ok(Math.abs(tinted.h - tint.h) < 5, `the belt's hue is ${tinted.h}`);
+  assert.ok(Math.abs(tinted.l - belt.l) < 0.02, `the belt's lightness went from ${belt.l} to ${tinted.l}`);
+  assert.deepEqual({ hair: at(5, 0), tunic: at(4, 8), trim: at(4, 15), outline: at(4, 16) }, before);
 });
 
 test("the head is found at the top of each frame, and a frame holding something over its head keeps the idle head", () => {
