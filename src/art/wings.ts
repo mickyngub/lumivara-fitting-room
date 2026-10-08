@@ -29,6 +29,16 @@ import {
   type Xy,
   type Art,
 } from "./wing-shapes";
+import { amethyst } from "./wings/amethyst";
+import { bat } from "./wings/bat";
+import { candy } from "./wings/candy";
+import { koiFin } from "./wings/koi-fin";
+import { peacock } from "./wings/peacock";
+import { ribbon } from "./wings/ribbon";
+import { seraph } from "./wings/seraph";
+import { spectral } from "./wings/spectral";
+import { stainedGlass } from "./wings/stained-glass";
+import { thundercloud } from "./wings/thundercloud";
 
 export type DrawnWing = {
   id: string;
@@ -856,4 +866,14 @@ export const DRAWN_WINGS: DrawnWing[] = [
   magma,
   neon,
   clockwork,
+  seraph,
+  bat,
+  peacock,
+  stainedGlass,
+  amethyst,
+  thundercloud,
+  koiFin,
+  spectral,
+  candy,
+  ribbon,
 ];
