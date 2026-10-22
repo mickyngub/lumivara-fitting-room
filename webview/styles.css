@@ -16,6 +16,9 @@
   --serif:
     Georgia, "Times New Roman", "Noto Serif Thai", "Noto Sans Thai", serif;
   --sans: "Google Sans", "Noto Sans Thai", Tahoma, Arial, sans-serif;
+  /* The 6 px scrollbar gutter makes up the rest of the right inset. */
+  --inset: 16px;
+  --inset-end: calc(var(--inset) - 6px);
   color-scheme: dark;
   --panel-bg: radial-gradient(
     120% 45% at 50% -5%,
@@ -35,14 +38,17 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* A thumb on no track. Chrome ignores the ::-webkit-scrollbar rules once the
-   standard properties are set, so those are given only where it lacks them. */
+/* A thumb on a track that wears the panel's background, since a transparent
+   one lets the host's shell show through. Chrome ignores the ::-webkit-scrollbar
+   rules once the standard properties are set, so those are given only where it
+   lacks them. */
 html::-webkit-scrollbar {
   width: 6px;
 }
 
 html::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--panel-bg);
+  background-attachment: fixed;
 }
 
 html::-webkit-scrollbar-thumb {
@@ -59,7 +65,7 @@ html::-webkit-scrollbar-thumb {
 
 body {
   margin: 0;
-  padding: 0 12px 20px;
+  padding: 0 var(--inset-end) 0 var(--inset);
   color: var(--parchment);
   font: 13px/1.45 var(--sans);
   background: var(--panel-bg);
@@ -106,8 +112,8 @@ button:disabled {
   position: sticky;
   top: 0;
   z-index: 4;
-  margin: 0 -12px;
-  padding: 8px 12px;
+  margin-inline: calc(-1 * var(--inset)) calc(-1 * var(--inset-end));
+  padding: 8px var(--inset-end) 8px var(--inset);
   background: var(--panel-bg);
   background-attachment: fixed;
 }
@@ -288,9 +294,7 @@ button:disabled {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 10px;
-  width: 296px;
-  max-width: 100%;
-  margin: 10px auto 0;
+  margin: 8px 0 16px;
 }
 
 .name-field span {
@@ -412,36 +416,49 @@ button:disabled {
 }
 
 h2 {
-  margin: 10px 2px 6px;
+  margin: 8px 0 0;
   color: var(--gold-light);
   font: 600 13px/1.4 var(--serif);
 }
 
-.looks {
-  display: flex;
+/* Equal columns that fill the inset exactly, the rest a sideways scroll away.
+   The 4 px either side is room for a tile's focus ring. */
+.looks,
+.frames {
+  --cols: 5;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - (var(--cols) - 1) * 6px) / var(--cols));
   gap: 6px;
   overflow-x: auto;
-  margin: 0 -12px;
-  padding: 8px 12px 8px;
+  margin: 0 -4px;
+  padding: 8px 4px;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: 12px;
+  scroll-padding-inline: 4px;
   scrollbar-width: thin;
   scrollbar-color: var(--gold-dark) transparent;
 }
 
+.looks,
+.wings {
+  --cols: 4;
+}
+
+.looks > *,
+.frames > * {
+  scroll-snap-align: start;
+}
+
 .look {
   position: relative;
-  flex: none;
   display: grid;
   justify-items: center;
   align-content: end;
-  width: 70px;
   height: 92px;
   padding: 2px 4px 6px;
   border: 1px solid var(--navy-line);
   border-radius: 12px;
   background: radial-gradient(circle at 50% 40%, #23407f, var(--navy) 70%);
-  scroll-snap-align: start;
   transition:
     transform 0.15s,
     border-color 0.15s,
@@ -491,30 +508,18 @@ h2 {
 }
 
 .fashion {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 6px;
-  padding-top: 8px;
-}
-
-.fashion .look {
-  width: 84px;
+  padding: 8px 0;
 }
 
 .empty {
-  flex: 1;
-  min-width: 140px;
+  grid-column: 1 / -1;
   margin: 0;
-  align-self: center;
   color: var(--muted);
   font-size: 11.5px;
   line-height: 1.5;
-}
-
-.wings .wing {
-  flex: none;
-  width: calc((100% - 18px) / 4);
-  scroll-snap-align: start;
 }
 
 .wing-plus {
@@ -548,14 +553,14 @@ h2 {
 }
 
 .wing-tool-hint {
-  margin: 0 2px;
+  margin: 0;
   color: var(--muted);
   font-size: 10.5px;
   line-height: 1.4;
 }
 
 .wing-error {
-  margin: 6px 2px 0;
+  margin: 0 0 16px;
   color: var(--coral);
   font-size: 11.5px;
 }
@@ -634,7 +639,7 @@ h2 {
 
 .dye-tray {
   position: relative;
-  margin-top: 10px;
+  margin: 4px 0 16px;
   padding: 8px 8px 6px;
   border: 1px solid var(--gold-dark);
   border-radius: 12px;
@@ -785,24 +790,6 @@ h2 {
   box-shadow: 0 0 12px rgba(201, 164, 92, 0.45);
 }
 
-.frames {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  margin: 0 -12px;
-  padding: 4px 12px 8px;
-  scroll-snap-type: x proximity;
-  scroll-padding-inline: 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--gold-dark) transparent;
-}
-
-.frames .fx {
-  flex: none;
-  width: calc((100% - 24px) / 5);
-  scroll-snap-align: start;
-}
-
 .fx img,
 .fx .fx-none,
 .fx .acc-thumb {
@@ -831,14 +818,12 @@ h2 {
   z-index: 5;
   display: grid;
   gap: 6px;
-  margin: 14px -12px -20px;
-  padding: 14px 12px calc(8px + env(safe-area-inset-bottom));
-  background: linear-gradient(
-    180deg,
-    rgba(8, 19, 43, 0) 0%,
-    rgba(8, 19, 43, 0.94) 22%,
-    var(--navy-night) 100%
-  );
+  margin: 8px calc(-1 * var(--inset-end)) 0 calc(-1 * var(--inset));
+  padding: 12px var(--inset-end) calc(16px + env(safe-area-inset-bottom))
+    var(--inset);
+  border-top: 1px solid var(--navy-line);
+  background: var(--panel-bg);
+  background-attachment: fixed;
 }
 
 .primary {
@@ -900,9 +885,9 @@ h2 {
 /* Over the button rather than above it in the flow, so an error moves nothing. */
 .place-error {
   position: absolute;
-  right: 12px;
-  bottom: calc(100% - 8px);
-  left: 12px;
+  right: var(--inset-end);
+  bottom: calc(100% + 8px);
+  left: var(--inset);
   margin: 0;
   padding: 6px 10px;
   border: 1px solid var(--coral);

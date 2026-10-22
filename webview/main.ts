@@ -950,13 +950,11 @@ async function placeLook(): Promise<void> {
 
 const errorText = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
-// The engine's own words, after a hint a player can act on when the browser would not give it graphics.
-const bootErrorText = (err: unknown) => {
-  const text = errorText(err);
-  return /webgl/i.test(text)
-    ? `เบราว์เซอร์เปิดกราฟิกให้ไม่ได้ ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วกดลองอีกครั้ง (${text})`
-    : text;
-};
+// A hint a player can act on when the browser would not give the engine graphics.
+const bootHint = (err: unknown) =>
+  /webgl/i.test(errorText(err))
+    ? "เบราว์เซอร์เปิดกราฟิกให้ไม่ได้ ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วกดลองอีกครั้ง"
+    : undefined;
 
 const withTimeout = <T>(
   work: Promise<T>,
@@ -1239,7 +1237,9 @@ function buildLayout(): void {
 
 /** While the catalog loads, the preview shows the chosen background at its real size with progress over it. */
 function showLoading(
-  progress: { done: number; total: number } | { error: string; title?: string },
+  progress:
+    | { done: number; total: number }
+    | { error: unknown; title?: string; hint?: string },
 ): void {
   if (!loadingBox) return;
   let art = loadingBox.querySelector<HTMLCanvasElement>("canvas");
@@ -1262,6 +1262,7 @@ function showLoading(
     };
     loadingArtFrame = requestAnimationFrame(paint);
   }
+  if ("error" in progress) console.warn(progress.error);
   const panel =
     "error" in progress
       ? h(
@@ -1272,7 +1273,8 @@ function showLoading(
             { class: "stage-loading-title" },
             progress.title ?? "โหลดข้อมูลชุดจาก Lumivara ไม่ได้",
           ),
-          h("p", { class: "stage-loading-detail" }, progress.error),
+          progress.hint &&
+            h("p", { class: "stage-loading-detail" }, progress.hint),
           h(
             "button",
             { type: "button", class: "retry", onclick: () => void load() },
@@ -1316,12 +1318,13 @@ function startStage(): void {
   live = liveStage;
   liveStage.setBackdrop(stageBackdrop(background()), !!background().effect);
   let up = false;
-  const fail = (reason: unknown) => {
+  const fail = (reason: unknown, hint = bootHint(reason)) => {
     if (up || live !== liveStage) return;
     stopWatching();
     showLoading({
-      error: bootErrorText(reason),
+      error: reason,
       title: "เปิดตัวอย่างตัวละครไม่ได้",
+      hint,
     });
   };
   const onError = (e: ErrorEvent) =>
@@ -1331,6 +1334,7 @@ function startStage(): void {
   const watchdog = setTimeout(
     () =>
       fail(
+        new Error(`preview not up after ${STAGE_BOOT_MS} ms`),
         `ตัวอย่างไม่ขึ้นภายใน ${STAGE_BOOT_MS / 1000} วินาที ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วลองอีกครั้ง`,
       ),
     STAGE_BOOT_MS,
@@ -2150,13 +2154,17 @@ async function load(): Promise<void> {
       showLoading({ done, total }),
     );
   } catch (err) {
-    showLoading({ error: errorText(err) });
+    showLoading({ error: err });
     return;
   }
   try {
     openRoom();
   } catch (err) {
-    showLoading({ error: bootErrorText(err), title: "เปิดห้องแต่งตัวไม่ได้" });
+    showLoading({
+      error: err,
+      title: "เปิดห้องแต่งตัวไม่ได้",
+      hint: bootHint(err),
+    });
   }
 }
 
