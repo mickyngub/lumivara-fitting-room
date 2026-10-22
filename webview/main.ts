@@ -2,25 +2,79 @@ import { CARD, FRAME, LOGO, PLATE } from "../src/card";
 import { apng } from "./apng";
 import { DRAWDY_SYMBOL_PNG } from "../src/brand-icons";
 import type { Look, Mount, NameFrame, WingInfo } from "../src/game/types";
-import { MAX_OWN_WINGS, type DriverToWebview, type SavedWing, type WebviewToDriver } from "../src/messages";
+import {
+  MAX_OWN_WINGS,
+  type DriverToWebview,
+  type SavedWing,
+  type WebviewToDriver,
+} from "../src/messages";
 import { drawnMounts } from "./own-mounts";
-import { drawnWings, isUploadId, newUploadId, readWing, uploadedWing, WING_AURAS, WING_SIZES, type OwnWing } from "./own-wings";
+import {
+  drawnWings,
+  isUploadId,
+  newUploadId,
+  readWing,
+  uploadedWing,
+  WING_AURAS,
+  WING_SIZES,
+  type OwnWing,
+} from "./own-wings";
 import { cleanName, NAME_MAX } from "../src/name";
-import { drawNameplate, loadNameFont, nameplate, type NameFrameArt, type Rect } from "./nametag";
+import {
+  drawNameplate,
+  loadNameFont,
+  nameplate,
+  type NameFrameArt,
+  type Rect,
+} from "./nametag";
 import { loadCatalog, loadImage, type Catalog } from "./live";
-import { CODE_WING_STYLES, DIRECTIONS, Stage, useWingStyles, type Backdrop, type BackdropTime, type Scene } from "./stage";
-import { FLAP_PERIOD_MS, poseAt, poseById, posesFor, type PoseDef } from "../src/game/poses";
+import {
+  CODE_WING_STYLES,
+  DIRECTIONS,
+  Stage,
+  useWingStyles,
+  type Backdrop,
+  type BackdropTime,
+  type Scene,
+} from "./stage";
+import {
+  FLAP_PERIOD_MS,
+  poseAt,
+  poseById,
+  posesFor,
+  type PoseDef,
+} from "../src/game/poses";
 import { EFFECTS, type Effect } from "../src/art/effects";
-import { ACCESSORIES, ACCESSORY_ART, type Accessory } from "../src/art/accessories";
-import { FRAME_GRID, FRAME_STYLES, frameById, paintFrame } from "../src/art/frames";
+import {
+  ACCESSORIES,
+  ACCESSORY_ART,
+  type Accessory,
+} from "../src/art/accessories";
+import {
+  FRAME_GRID,
+  FRAME_STYLES,
+  frameById,
+  paintFrame,
+} from "../src/art/frames";
 import { pixels, type Pixels } from "../src/art/pixels";
-import { dyePixels, dyeShades, hexToHsl, hslToRgb, mainColour, type Hsl } from "../src/art/dye";
+import {
+  dyePixels,
+  dyeShades,
+  hexToHsl,
+  hslToRgb,
+  mainColour,
+  type Hsl,
+} from "../src/art/dye";
 import { CLASS_SKINS, type ClassSkin } from "../src/art/skins";
 import { THEMES, type Theme } from "./themes";
 
 // Native game pixels; CSS scales the canvas up the way the game scales its own.
 const EXPORT_SCALE = 4;
-const EXPORT_NATIVE = { w: FRAME.w / EXPORT_SCALE, h: FRAME.h / EXPORT_SCALE, feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 70 } };
+const EXPORT_NATIVE = {
+  w: FRAME.w / EXPORT_SCALE,
+  h: FRAME.h / EXPORT_SCALE,
+  feet: { x: FRAME.w / EXPORT_SCALE / 2, y: 70 },
+};
 // The preview takes at most this share of the panel's height, so the options under it keep room.
 const STAGE_SHARE = 0.5;
 const POSES_H = 36;
@@ -29,12 +83,24 @@ const STAGE_H = 102;
 const panelWidth = () => document.getElementById("root")!.clientWidth;
 // Whole and half steps keep every game pixel the same size on a 2x screen.
 const fitStageScale = (stageW: number) =>
-  Math.max(1, Math.floor(Math.min(panelWidth() / stageW, (innerHeight * STAGE_SHARE - POSES_H) / STAGE_H) * 2) / 2);
+  Math.max(
+    1,
+    Math.floor(
+      Math.min(
+        panelWidth() / stageW,
+        (innerHeight * STAGE_SHARE - POSES_H) / STAGE_H,
+      ) * 2,
+    ) / 2,
+  );
 let stageScale = fitStageScale(MIN_STAGE_W);
 // Room under the feet for a name frame and the class, like the card's, and as wide as the
 // panel holds at the preview's scale, so the picture fills it.
 const STAGE_W = Math.floor(panelWidth() / stageScale / 2) * 2;
-const STAGE_NATIVE = { w: STAGE_W, h: STAGE_H, feet: { x: STAGE_W / 2, y: 67 } };
+const STAGE_NATIVE = {
+  w: STAGE_W,
+  h: STAGE_H,
+  feet: { x: STAGE_W / 2, y: 67 },
+};
 const DRAG_STEP_PX = 26;
 // The preview's engine has this long to start once the catalog is in, and placing a card
 // this long to get its own engine ready, before the panel says so and offers a retry.
@@ -47,9 +113,22 @@ const SAVE_NAME_MS = 400;
 // The nameplate shrinks to stay this far inside the picture: the stage's
 // thickest card frame, or the card's picture edge.
 const PLATE_MARGIN = 1;
-const insetRoom = (w: number, h: number, inset: number): Rect => ({ x: inset, y: inset, w: w - 2 * inset, h: h - 2 * inset });
-const STAGE_PLATE_ROOM = insetRoom(STAGE_NATIVE.w, STAGE_NATIVE.h, Math.max(...FRAME_STYLES.map((f) => f.band)) + 1 + PLATE_MARGIN);
-const CARD_PLATE_ROOM = insetRoom(EXPORT_NATIVE.w, EXPORT_NATIVE.h, PLATE_MARGIN);
+const insetRoom = (w: number, h: number, inset: number): Rect => ({
+  x: inset,
+  y: inset,
+  w: w - 2 * inset,
+  h: h - 2 * inset,
+});
+const STAGE_PLATE_ROOM = insetRoom(
+  STAGE_NATIVE.w,
+  STAGE_NATIVE.h,
+  Math.max(...FRAME_STYLES.map((f) => f.band)) + 1 + PLATE_MARGIN,
+);
+const CARD_PLATE_ROOM = insetRoom(
+  EXPORT_NATIVE.w,
+  EXPORT_NATIVE.h,
+  PLATE_MARGIN,
+);
 
 const api = acquireDrawdyApi();
 const send = (message: WebviewToDriver, transfer?: Transferable[]) =>
@@ -64,7 +143,8 @@ let OUTFITS: Look[] = [];
 let WINGS: WingInfo[] = [];
 let NAME_FRAMES: NameFrame[] = [];
 let MOUNTS: Mount[] = [];
-const outfitsOf = (classId: string) => OUTFITS.filter((o) => o.classIds.includes(classId));
+const outfitsOf = (classId: string) =>
+  OUTFITS.filter((o) => o.classIds.includes(classId));
 
 let classId = "";
 let outfitId: string | null = null;
@@ -82,8 +162,14 @@ let pendingWings: SavedWing[] | null = null;
 // A new image replaces this wing's, or adds a wing when it is null.
 let replacing: string | null = null;
 const savedWingOf = (id: string | null) => savedWings.find((w) => w.id === id);
-const ownWingName = (id: string) => (savedWings.length > 1 ? `ปีกของคุณ ${savedWings.findIndex((w) => w.id === id) + 1}` : "ปีกของคุณ");
-const wingName = (id: string) => (isUploadId(id) ? ownWingName(id) : (WINGS.find((w) => w.id === id)?.name ?? "ปีก"));
+const ownWingName = (id: string) =>
+  savedWings.length > 1
+    ? `ปีกของคุณ ${savedWings.findIndex((w) => w.id === id) + 1}`
+    : "ปีกของคุณ";
+const wingName = (id: string) =>
+  isUploadId(id)
+    ? ownWingName(id)
+    : (WINGS.find((w) => w.id === id)?.name ?? "ปีก");
 const DYES = [
   { hex: "#e5484d", name: "แดง" },
   { hex: "#3fbf6a", name: "เขียว" },
@@ -97,20 +183,33 @@ const CUSTOM_DYE = "#7ec8ff";
 let accessoryId: string | null = null;
 // Each accessory keeps the colour it was given.
 const accessoryDyes = new Map<string, string>();
-const accessoryDye = () => (accessoryId ? (accessoryDyes.get(accessoryId) ?? null) : null);
+const accessoryDye = () =>
+  accessoryId ? (accessoryDyes.get(accessoryId) ?? null) : null;
 // The mount ridden, set once its sheet is in the preview, and the one last picked.
 let mountId: string | null = null;
 let mountPicked: string | null = null;
 const mountSheets = new Map<string, Promise<HTMLImageElement>>();
 let nameFrameId: string | null = null;
 const nameFrame = () => NAME_FRAMES.find((f) => f.id === nameFrameId);
-type Background = { id: string; name: string; plate: string; theme?: Theme; effect?: Effect };
+type Background = {
+  id: string;
+  name: string;
+  plate: string;
+  theme?: Theme;
+  effect?: Effect;
+};
 const BACKGROUNDS: Background[] = [
   ...THEMES.map((t) => ({ id: t.id, name: t.name, plate: t.plate, theme: t })),
-  ...EFFECTS.map((e) => ({ id: e.id, name: e.name, plate: e.plate, effect: e })),
+  ...EFFECTS.map((e) => ({
+    id: e.id,
+    name: e.name,
+    plate: e.plate,
+    effect: e,
+  })),
 ];
 let backgroundId = BACKGROUNDS[0].id;
-const background = () => BACKGROUNDS.find((b) => b.id === backgroundId) ?? BACKGROUNDS[0];
+const background = () =>
+  BACKGROUNDS.find((b) => b.id === backgroundId) ?? BACKGROUNDS[0];
 let frameId = FRAME_STYLES[0].id;
 let dirIndex = Math.max(0, DIRECTIONS.indexOf("south"));
 let poseId = "idle";
@@ -140,13 +239,26 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const plainLook = (): Look => CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
+const plainLook = (): Look =>
+  CLASS_LOOKS.find((l) => l.classId === classId) ?? CLASS_LOOKS[0];
 const look = (): Look => OUTFITS.find((o) => o.id === outfitId) ?? plainLook();
-const skin = (): ClassSkin | undefined => (outfitId ? undefined : CLASS_SKINS.find((s) => s.id === skinId && s.classId === classId));
+const skin = (): ClassSkin | undefined =>
+  outfitId
+    ? undefined
+    : CLASS_SKINS.find((s) => s.id === skinId && s.classId === classId);
 const skinsOf = (id: string) => CLASS_SKINS.filter((s) => s.classId === id);
 const skinDyes = (s: ClassSkin) => [...s.dyes, s.greys ?? null];
 // Marks the fitting room's own items in the rows that also hold the game's.
-const ownMark = () => h("i", { class: "own-mark", title: "ของห้องแต่งตัว ไม่มีในเกม", "aria-hidden": "true" }, "✦");
+const ownMark = () =>
+  h(
+    "i",
+    {
+      class: "own-mark",
+      title: "ของห้องแต่งตัว ไม่มีในเกม",
+      "aria-hidden": "true",
+    },
+    "✦",
+  );
 // A skin is the plain look under colours of its own, kept apart from the plain look's.
 const dyeKey = (l: Look): string => {
   const s = skin();
@@ -161,7 +273,11 @@ const png = (b64: string) => `data:image/png;base64,${b64}`;
 // A look without the chosen pose (cast is the Mage's), or a rider, stands instead, and gets the pose back when it is chosen again.
 const poseOf = (l: Look): PoseDef => {
   const poses = posesFor(l, !!mountId);
-  return poses.find((p) => p.id === poseId) ?? poses.find((p) => p.id === "idle") ?? poseById("idle");
+  return (
+    poses.find((p) => p.id === poseId) ??
+    poses.find((p) => p.id === "idle") ??
+    poseById("idle")
+  );
 };
 
 function sceneAt(l: Look, direction: string, t: number): Scene {
@@ -181,7 +297,13 @@ function sceneAt(l: Look, direction: string, t: number): Scene {
   };
 }
 
-const thumbRowOf = (l: Look) => Math.max(0, l.sheet.rows.findIndex((r) => r.anim === THUMB_ROW.anim && r.dir === THUMB_ROW.dir));
+const thumbRowOf = (l: Look) =>
+  Math.max(
+    0,
+    l.sheet.rows.findIndex(
+      (r) => r.anim === THUMB_ROW.anim && r.dir === THUMB_ROW.dir,
+    ),
+  );
 
 function thumb(l: Look, size: number, frame?: string): HTMLElement {
   const { cell, rows } = l.sheet;
@@ -194,13 +316,20 @@ function thumb(l: Look, size: number, frame?: string): HTMLElement {
       `width:${size}px`,
       `height:${Math.round(cell.h * s)}px`,
       `background-image:url(${frame ?? png(l.sheet.png)})`,
-      frame ? `background-size:${size}px ${Math.round(cell.h * s)}px` : `background-size:${cols * cell.w * s}px ${rows.length * cell.h * s}px`,
-      frame ? "background-position:0 0" : `background-position:0 ${-row * cell.h * s}px`,
+      frame
+        ? `background-size:${size}px ${Math.round(cell.h * s)}px`
+        : `background-size:${cols * cell.w * s}px ${rows.length * cell.h * s}px`,
+      frame
+        ? "background-position:0 0"
+        : `background-position:0 ${-row * cell.h * s}px`,
     ].join(";"),
   });
 }
 
-function drawFloor(ctx: CanvasRenderingContext2D, feet: { x: number; y: number }): void {
+function drawFloor(
+  ctx: CanvasRenderingContext2D,
+  feet: { x: number; y: number },
+): void {
   const glow = ctx.createRadialGradient(feet.x, feet.y, 2, feet.x, feet.y, 30);
   glow.addColorStop(0, "rgba(255, 233, 166, 0.22)");
   glow.addColorStop(1, "rgba(255, 233, 166, 0)");
@@ -216,9 +345,17 @@ function drawFloor(ctx: CanvasRenderingContext2D, feet: { x: number; y: number }
 }
 
 const effectPixels = new Map<string, Pixels>();
-const phaseOf = (t: BackdropTime) => ((t.ms % t.loopMs) + t.loopMs) % t.loopMs / t.loopMs;
+const phaseOf = (t: BackdropTime) =>
+  (((t.ms % t.loopMs) + t.loopMs) % t.loopMs) / t.loopMs;
 
-function paintEffect(ctx: CanvasRenderingContext2D, effect: Effect, width: number, height: number, feet: { x: number; y: number }, phase: number): void {
+function paintEffect(
+  ctx: CanvasRenderingContext2D,
+  effect: Effect,
+  width: number,
+  height: number,
+  feet: { x: number; y: number },
+  phase: number,
+): void {
   const key = `${width}x${height}`;
   let px = effectPixels.get(key);
   if (!px) effectPixels.set(key, (px = pixels(width, height)));
@@ -226,35 +363,66 @@ function paintEffect(ctx: CanvasRenderingContext2D, effect: Effect, width: numbe
   ctx.putImageData(new ImageData(px.data, width, height), 0, 0);
 }
 
-const stageBackdrop = (b: Background): Backdrop => (ctx, width, height, feet, time) => {
-  if (b.effect) return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
-  const t = b.theme!;
-  const sky = ctx.createRadialGradient(width / 2, height * 0.75, 4, width / 2, height * 0.75, width * 0.8);
-  sky.addColorStop(0, t.glow);
-  sky.addColorStop(0.55, t.plate);
-  sky.addColorStop(1, t.edge);
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = "rgba(255, 233, 166, 0.5)";
-  for (const [x, y] of [[0.18, 0.2], [0.82, 0.14], [0.7, 0.38], [0.3, 0.44], [0.9, 0.55]]) {
-    ctx.fillRect(Math.round(x * width), Math.round(y * height), 1, 1);
-  }
-  drawFloor(ctx, feet);
-};
+const stageBackdrop =
+  (b: Background): Backdrop =>
+  (ctx, width, height, feet, time) => {
+    if (b.effect)
+      return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
+    const t = b.theme!;
+    const sky = ctx.createRadialGradient(
+      width / 2,
+      height * 0.75,
+      4,
+      width / 2,
+      height * 0.75,
+      width * 0.8,
+    );
+    sky.addColorStop(0, t.glow);
+    sky.addColorStop(0.55, t.plate);
+    sky.addColorStop(1, t.edge);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = "rgba(255, 233, 166, 0.5)";
+    for (const [x, y] of [
+      [0.18, 0.2],
+      [0.82, 0.14],
+      [0.7, 0.38],
+      [0.3, 0.44],
+      [0.9, 0.55],
+    ]) {
+      ctx.fillRect(Math.round(x * width), Math.round(y * height), 1, 1);
+    }
+    drawFloor(ctx, feet);
+  };
 
 // The card's background is baked into every frame so a frame fully covers
 // the ones beneath it whenever the board draws without animation.
-const cardBackdrop = (b: Background): Backdrop => (ctx, width, height, feet, time) => {
-  if (b.effect) return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
-  ctx.fillStyle = b.plate;
-  ctx.fillRect(0, 0, width, height);
-  drawFloor(ctx, feet);
-};
+const cardBackdrop =
+  (b: Background): Backdrop =>
+  (ctx, width, height, feet, time) => {
+    if (b.effect)
+      return paintEffect(ctx, b.effect, width, height, feet, phaseOf(time));
+    ctx.fillStyle = b.plate;
+    ctx.fillRect(0, 0, width, height);
+    drawFloor(ctx, feet);
+  };
 
-function pick(tile: Look, label: string, pressed: boolean, onclick: () => void, badge?: string) {
+function pick(
+  tile: Look,
+  label: string,
+  pressed: boolean,
+  onclick: () => void,
+  badge?: string,
+) {
   return h(
     "button",
-    { type: "button", class: "look", title: tile.name, "aria-pressed": String(pressed), onclick },
+    {
+      type: "button",
+      class: "look",
+      title: tile.name,
+      "aria-pressed": String(pressed),
+      onclick,
+    },
     thumb(tile, 56),
     h("span", { class: "look-name" }, label),
     badge && h("em", {}, badge),
@@ -283,7 +451,9 @@ function renderClasses(): void {
 // A tile whose look can be dyed carries the colour its clothes were given.
 function dyeable(tile: HTMLElement, l: Look): HTMLElement {
   tile.dataset.look = l.id;
-  tile.append(h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }));
+  tile.append(
+    h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
+  );
   return tile;
 }
 
@@ -291,8 +461,18 @@ function skinTile(s: ClassSkin): HTMLElement {
   const plain = plainLook();
   const tile = h(
     "button",
-    { type: "button", class: "look", title: s.name, "aria-pressed": String(skin()?.id === s.id), onclick: () => chooseSkin(s) },
-    thumb(plain, 56, live?.dyedFrame(plain, skinDyes(s), thumbRowOf(plain), 0) ?? undefined),
+    {
+      type: "button",
+      class: "look",
+      title: s.name,
+      "aria-pressed": String(skin()?.id === s.id),
+      onclick: () => chooseSkin(s),
+    },
+    thumb(
+      plain,
+      56,
+      live?.dyedFrame(plain, skinDyes(s), thumbRowOf(plain), 0) ?? undefined,
+    ),
     h("span", { class: "look-name" }, s.name),
     h("em", {}, "สกิน"),
     ownMark(),
@@ -311,7 +491,9 @@ function chooseSkin(s: ClassSkin): void {
 function renderFashion(): void {
   const plain = plainLook();
   const outfits = outfitsOf(classId);
-  const withOutfits = CLASS_LOOKS.filter((c) => outfitsOf(c.classId).length).map((c) => c.className).join(", ");
+  const withOutfits = CLASS_LOOKS.filter((c) => outfitsOf(c.classId).length)
+    .map((c) => c.className)
+    .join(", ");
   document.getElementById("fashion")!.replaceChildren(
     dyeable(
       pick(plain, "ชุดปกติ", outfitId === null && !skin(), () => {
@@ -363,14 +545,27 @@ function renderChoices(): void {
   if (!catalog) return;
   document
     .querySelectorAll<HTMLElement>("[data-wings]")
-    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.wings || null) === wingsId)));
+    .forEach((n) =>
+      n.setAttribute(
+        "aria-pressed",
+        String((n.dataset.wings || null) === wingsId),
+      ),
+    );
   document
     .querySelectorAll<HTMLElement>("[data-name-frame]")
-    .forEach((n) => n.setAttribute("aria-pressed", String((n.dataset.nameFrame || null) === nameFrameId)));
+    .forEach((n) =>
+      n.setAttribute(
+        "aria-pressed",
+        String((n.dataset.nameFrame || null) === nameFrameId),
+      ),
+    );
   document.querySelectorAll<HTMLElement>("[data-mount]").forEach((n) => {
     const id = n.dataset.mount || null;
     n.setAttribute("aria-pressed", String(id === mountId));
-    n.setAttribute("aria-busy", String(!!id && id === mountPicked && id !== mountId));
+    n.setAttribute(
+      "aria-busy",
+      String(!!id && id === mountPicked && id !== mountId),
+    );
   });
   syncWingDyes();
   syncLookDyes();
@@ -400,7 +595,10 @@ const frameArt = new Map<string, Promise<NameFrameArt>>();
 function nameFrameArt(frame: NameFrame): Promise<NameFrameArt> {
   let art = frameArt.get(frame.id);
   if (!art) {
-    art = Promise.all([loadImage(frame.url), frame.gemUrl ? loadImage(frame.gemUrl) : undefined]).then(([image, gem]) => ({
+    art = Promise.all([
+      loadImage(frame.url),
+      frame.gemUrl ? loadImage(frame.gemUrl) : undefined,
+    ]).then(([image, gem]) => ({
       frame,
       image,
       ...(gem ? { gem } : {}),
@@ -415,17 +613,29 @@ let plateDraw = 0;
 
 // The stage's plate is drawn the way the card's is, at the screen's resolution.
 function renderName(): void {
-  const canvas = document.getElementById("nameplate") as HTMLCanvasElement | null;
+  const canvas = document.getElementById(
+    "nameplate",
+  ) as HTMLCanvasElement | null;
   if (!canvas) return;
   const lines = nameplate(playerName, catalog ? plainLook().className : "");
   const frame = nameFrame();
   const draw = ++plateDraw;
-  void Promise.all([loadNameFont(lines), frame && nameFrameArt(frame).catch(() => undefined)]).then(([, art]) => {
+  void Promise.all([
+    loadNameFont(lines),
+    frame && nameFrameArt(frame).catch(() => undefined),
+  ]).then(([, art]) => {
     if (draw !== plateDraw) return;
     const scale = stageScale * devicePixelRatio;
     canvas.width = Math.round(STAGE_NATIVE.w * scale);
     canvas.height = Math.round(STAGE_NATIVE.h * scale);
-    drawNameplate(canvas.getContext("2d")!, lines, STAGE_NATIVE.feet, scale, STAGE_PLATE_ROOM, art);
+    drawNameplate(
+      canvas.getContext("2d")!,
+      lines,
+      STAGE_NATIVE.feet,
+      scale,
+      STAGE_PLATE_ROOM,
+      art,
+    );
   });
 }
 
@@ -455,18 +665,37 @@ function renderBackgrounds(): void {
   const colours = THEMES.map((t) =>
     h(
       "button",
-      { type: "button", class: "fx", title: t.name, "aria-pressed": String(t.id === backgroundId), onclick: () => setBackground(t.id, true) },
-      h("span", { class: "fx-thumb", style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})` }),
+      {
+        type: "button",
+        class: "fx",
+        title: t.name,
+        "aria-pressed": String(t.id === backgroundId),
+        onclick: () => setBackground(t.id, true),
+      },
+      h("span", {
+        class: "fx-thumb",
+        style: `background:radial-gradient(circle at 50% 70%, ${t.glow}, ${t.plate} 60%, ${t.edge})`,
+      }),
       h("span", {}, t.name),
     ),
   );
   fxThumbs = [];
   const animated = EFFECTS.map((e) => {
-    const canvas = h("canvas", { width: FX_THUMB.w, height: FX_THUMB.h, class: "fx-thumb" });
+    const canvas = h("canvas", {
+      width: FX_THUMB.w,
+      height: FX_THUMB.h,
+      class: "fx-thumb",
+    });
     fxThumbs.push({ canvas, effect: e });
     return h(
       "button",
-      { type: "button", class: "fx", title: e.name, "aria-pressed": String(e.id === backgroundId), onclick: () => setBackground(e.id, true) },
+      {
+        type: "button",
+        class: "fx",
+        title: e.name,
+        "aria-pressed": String(e.id === backgroundId),
+        onclick: () => setBackground(e.id, true),
+      },
       canvas,
       h("span", {}, e.name),
     );
@@ -478,7 +707,15 @@ function animateFxThumbs(now: number): void {
   const phase = (now % FLAP_PERIOD_MS.idle) / FLAP_PERIOD_MS.idle;
   for (const { canvas, effect } of fxThumbs) {
     const ctx = canvas.getContext("2d");
-    if (ctx) paintEffect(ctx, effect, FX_THUMB.w, FX_THUMB.h, { x: FX_THUMB.w / 2, y: FX_THUMB.h - 3 }, phase);
+    if (ctx)
+      paintEffect(
+        ctx,
+        effect,
+        FX_THUMB.w,
+        FX_THUMB.h,
+        { x: FX_THUMB.w / 2, y: FX_THUMB.h - 3 },
+        phase,
+      );
   }
   requestAnimationFrame(animateFxThumbs);
 }
@@ -494,9 +731,14 @@ function setBackground(id: string, save: boolean): void {
 function frameCanvas(scale: number): HTMLCanvasElement {
   const px = paintFrame(frameById(frameId));
   const small = h("canvas", { width: FRAME_GRID.w, height: FRAME_GRID.h });
-  small.getContext("2d")!.putImageData(new ImageData(px.data, FRAME_GRID.w, FRAME_GRID.h), 0, 0);
+  small
+    .getContext("2d")!
+    .putImageData(new ImageData(px.data, FRAME_GRID.w, FRAME_GRID.h), 0, 0);
   if (scale === 1) return small;
-  const big = h("canvas", { width: FRAME_GRID.w * scale, height: FRAME_GRID.h * scale });
+  const big = h("canvas", {
+    width: FRAME_GRID.w * scale,
+    height: FRAME_GRID.h * scale,
+  });
   const ctx = big.getContext("2d")!;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(small, 0, 0, big.width, big.height);
@@ -508,17 +750,38 @@ const FRAME_THUMB = { w: 48, h: 32 };
 function renderFrames(): void {
   const tiles = FRAME_STYLES.map((f) => {
     const inset = f.band + 1;
-    const px = paintFrame(f, { ...FRAME_THUMB, scale: 1, picture: { x: inset, y: inset, w: FRAME_THUMB.w - inset * 2, h: FRAME_THUMB.h - inset * 2 } });
+    const px = paintFrame(f, {
+      ...FRAME_THUMB,
+      scale: 1,
+      picture: {
+        x: inset,
+        y: inset,
+        w: FRAME_THUMB.w - inset * 2,
+        h: FRAME_THUMB.h - inset * 2,
+      },
+    });
     const art = h("canvas", { width: FRAME_THUMB.w, height: FRAME_THUMB.h });
-    art.getContext("2d")!.putImageData(new ImageData(px.data, FRAME_THUMB.w, FRAME_THUMB.h), 0, 0);
-    const thumb = h("canvas", { width: FRAME_THUMB.w, height: FRAME_THUMB.h, class: "fx-thumb" });
+    art
+      .getContext("2d")!
+      .putImageData(new ImageData(px.data, FRAME_THUMB.w, FRAME_THUMB.h), 0, 0);
+    const thumb = h("canvas", {
+      width: FRAME_THUMB.w,
+      height: FRAME_THUMB.h,
+      class: "fx-thumb",
+    });
     const ctx = thumb.getContext("2d")!;
     ctx.fillStyle = background().plate;
     ctx.fillRect(0, 0, FRAME_THUMB.w, FRAME_THUMB.h);
     ctx.drawImage(art, 0, 0);
     return h(
       "button",
-      { type: "button", class: "fx", title: f.name, "aria-pressed": String(f.id === frameId), onclick: () => setFrame(f.id, true) },
+      {
+        type: "button",
+        class: "fx",
+        title: f.name,
+        "aria-pressed": String(f.id === frameId),
+        onclick: () => setFrame(f.id, true),
+      },
       thumb,
       h("span", {}, f.name),
     );
@@ -526,7 +789,8 @@ function renderFrames(): void {
   refill("frames", tiles);
   const style = frameById(frameId);
   const stage = document.querySelector<HTMLElement>(".stage");
-  if (stage) stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.colours.mid}40`;
+  if (stage)
+    stage.style.boxShadow = `0 10px 30px rgba(0,0,0,0.45), 0 0 18px ${style.colours.mid}40`;
   drawStageFrame();
 }
 
@@ -538,12 +802,19 @@ function setFrame(id: string, save: boolean): void {
 
 // The chosen card frame, fitted to the preview's own pixel grid.
 function drawStageFrame(): void {
-  const canvas = document.getElementById("stage-frame-art") as HTMLCanvasElement | null;
+  const canvas = document.getElementById(
+    "stage-frame-art",
+  ) as HTMLCanvasElement | null;
   if (!canvas) return;
   const style = frameById(frameId);
   const inset = style.band + 1;
   const { w, h } = STAGE_NATIVE;
-  const px = paintFrame(style, { w, h, scale: 1, picture: { x: inset, y: inset, w: w - inset * 2, h: h - inset * 2 } });
+  const px = paintFrame(style, {
+    w,
+    h,
+    scale: 1,
+    picture: { x: inset, y: inset, w: w - inset * 2, h: h - inset * 2 },
+  });
   canvas.getContext("2d")!.putImageData(new ImageData(px.data, w, h), 0, 0);
 }
 
@@ -558,9 +829,14 @@ function setPlacing(state: "idle" | "busy" | "placed"): void {
   button.disabled = busy;
   button.classList.toggle("busy", busy);
   button.classList.toggle("placed", state === "placed");
-  button.querySelector(".primary-label")!.textContent = busy ? "กำลังวางลงบอร์ด…" : state === "placed" ? "✓ วางแล้ว" : PLACE_LABEL;
+  button.querySelector(".primary-label")!.textContent = busy
+    ? "กำลังวางลงบอร์ด…"
+    : state === "placed"
+      ? "✓ วางแล้ว"
+      : PLACE_LABEL;
   clearTimeout(placedTimer);
-  if (state === "placed") placedTimer = setTimeout(() => setPlacing("idle"), PLACED_MS);
+  if (state === "placed")
+    placedTimer = setTimeout(() => setPlacing("idle"), PLACED_MS);
 }
 
 function showPlaceError(message: string | null): void {
@@ -597,7 +873,11 @@ async function exportCard(l: Look): Promise<string> {
     wingTextures: catalog.wingTextures,
     backdrop: cardBackdrop(background()),
   });
-  await withTimeout(exporter.ready, CARD_STAGE_MS, "ทำภาพการ์ดไม่ทัน ลองวางอีกครั้ง");
+  await withTimeout(
+    exporter.ready,
+    CARD_STAGE_MS,
+    "ทำภาพการ์ดไม่ทัน ลองวางอีกครั้ง",
+  );
   exporter.setBackdrop(cardBackdrop(background()), !!background().effect);
   const own = isUploadId(wingsId) ? ownWings.get(wingsId) : undefined;
   if (own) await exporter.useWing(own.id, own.style);
@@ -613,24 +893,43 @@ async function exportCard(l: Look): Promise<string> {
   const overlay = frameCanvas(FRAME_GRID.scale);
   const frames: Uint8ClampedArray[] = [];
   for (let k = 0; k < cardFrames; k++) {
-    const shot = await exporter.capture(sceneAt(l, direction, (k * loopMs) / cardFrames));
+    const shot = await exporter.capture(
+      sceneAt(l, direction, (k * loopMs) / cardFrames),
+    );
     const card = h("canvas", { width: CARD.w, height: CARD.h });
     const ctx = card.getContext("2d")!;
     ctx.fillStyle = background().plate;
     ctx.beginPath();
-    ctx.roundRect(PLATE.inset, PLATE.inset, CARD.w - PLATE.inset * 2, CARD.h - PLATE.inset * 2, PLATE.radius);
+    ctx.roundRect(
+      PLATE.inset,
+      PLATE.inset,
+      CARD.w - PLATE.inset * 2,
+      CARD.h - PLATE.inset * 2,
+      PLATE.radius,
+    );
     ctx.fill();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(overlay, 0, 0);
     ctx.translate(CARD.pad, CARD.pad);
     ctx.drawImage(shot, 0, 0, FRAME.w, FRAME.h);
-    drawNameplate(ctx, lines, EXPORT_NATIVE.feet, EXPORT_SCALE, CARD_PLATE_ROOM, art);
+    drawNameplate(
+      ctx,
+      lines,
+      EXPORT_NATIVE.feet,
+      EXPORT_SCALE,
+      CARD_PLATE_ROOM,
+      art,
+    );
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logo, LOGO.x, LOGO.y, LOGO.w, LOGO.h);
     frames.push(ctx.getImageData(0, 0, CARD.w, CARD.h).data);
   }
-  const image = apng(frames, { w: CARD.w, h: CARD.h }, { num: Math.round(loopMs), den: cardFrames * 1000 });
+  const image = apng(
+    frames,
+    { w: CARD.w, h: CARD.h },
+    { num: Math.round(loopMs), den: cardFrames * 1000 },
+  );
   return dataUrl(new Blob([image], { type: "image/png" }));
 }
 
@@ -649,31 +948,67 @@ async function placeLook(): Promise<void> {
   }
 }
 
-const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const errorText = (err: unknown) =>
+  err instanceof Error ? err.message : String(err);
 // The engine's own words, after a hint a player can act on when the browser would not give it graphics.
 const bootErrorText = (err: unknown) => {
   const text = errorText(err);
-  return /webgl/i.test(text) ? `เบราว์เซอร์เปิดกราฟิกให้ไม่ได้ ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วกดลองอีกครั้ง (${text})` : text;
+  return /webgl/i.test(text)
+    ? `เบราว์เซอร์เปิดกราฟิกให้ไม่ได้ ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วกดลองอีกครั้ง (${text})`
+    : text;
 };
 
-const withTimeout = <T>(work: Promise<T>, ms: number, message: string): Promise<T> =>
-  Promise.race([work, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+const withTimeout = <T>(
+  work: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> =>
+  Promise.race([
+    work,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), ms),
+    ),
+  ]);
 
 let loadingBox: HTMLElement | null = null;
 let loadingArtFrame = 0;
 
 function stageControls(turn: (delta: number) => void): HTMLElement[] {
   return [
-    h("button", { type: "button", class: "turn left", "aria-label": "หมุนซ้าย", onclick: () => turn(1) }, "‹"),
-    h("button", { type: "button", class: "turn right", "aria-label": "หมุนขวา", onclick: () => turn(-1) }, "›"),
+    h(
+      "button",
+      {
+        type: "button",
+        class: "turn left",
+        "aria-label": "หมุนซ้าย",
+        onclick: () => turn(1),
+      },
+      "‹",
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        class: "turn right",
+        "aria-label": "หมุนขวา",
+        onclick: () => turn(-1),
+      },
+      "›",
+    ),
   ];
 }
 
-const skeletons = (n: number, className: string) => Array.from({ length: n }, () => h("div", { class: `${className} skeleton`, "aria-hidden": "true" }));
+const skeletons = (n: number, className: string) =>
+  Array.from({ length: n }, () =>
+    h("div", { class: `${className} skeleton`, "aria-hidden": "true" }),
+  );
 
 function fitStage(): void {
   stageScale = fitStageScale(STAGE_NATIVE.w);
-  const size = { width: `${STAGE_NATIVE.w * stageScale}px`, height: `${STAGE_NATIVE.h * stageScale}px` };
+  const size = {
+    width: `${STAGE_NATIVE.w * stageScale}px`,
+    height: `${STAGE_NATIVE.h * stageScale}px`,
+  };
   const frame = document.getElementById("stage-frame");
   if (frame) Object.assign(frame.style, size);
   if (live?.canvas) Object.assign(live.canvas.style, size);
@@ -682,19 +1017,41 @@ function fitStage(): void {
 
 /** The whole panel at its final size, before the game's catalog arrives, so nothing moves when it does. */
 function buildLayout(): void {
-  const plate = h("canvas", { id: "nameplate", class: "nameplate", "aria-hidden": "true" });
-  const frameArt = h("canvas", { id: "stage-frame-art", class: "stage-frame-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h, "aria-hidden": "true" });
+  const plate = h("canvas", {
+    id: "nameplate",
+    class: "nameplate",
+    "aria-hidden": "true",
+  });
+  const frameArt = h("canvas", {
+    id: "stage-frame-art",
+    class: "stage-frame-art",
+    width: STAGE_NATIVE.w,
+    height: STAGE_NATIVE.h,
+    "aria-hidden": "true",
+  });
   loadingBox = h("div", { id: "stage-loading", class: "stage-loading" });
   const canvasFrame = h(
     "div",
-    { id: "stage-frame", class: "stage-frame", style: `width:${STAGE_NATIVE.w * stageScale}px;height:${STAGE_NATIVE.h * stageScale}px` },
+    {
+      id: "stage-frame",
+      class: "stage-frame",
+      style: `width:${STAGE_NATIVE.w * stageScale}px;height:${STAGE_NATIVE.h * stageScale}px`,
+    },
     loadingBox,
     plate,
     frameArt,
     // In the picture's corner at any size of the preview.
     h("span", { class: "drag-hint", "aria-hidden": "true" }, "ลากเพื่อหมุน"),
   );
-  const host = h("div", { id: "stage-host", role: "img", "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน" }, canvasFrame);
+  const host = h(
+    "div",
+    {
+      id: "stage-host",
+      role: "img",
+      "aria-label": "ตัวอย่างตัวละคร ลากซ้ายขวาเพื่อหมุน",
+    },
+    canvasFrame,
+  );
   const turn = (delta: number) => {
     dirIndex = (dirIndex + delta + DIRECTIONS.length) % DIRECTIONS.length;
   };
@@ -706,7 +1063,12 @@ function buildLayout(): void {
         "div",
         { class: "stage loading" },
         h("div", { class: "stage-view" }, host, ...stageControls(turn)),
-        h("div", { id: "poses", class: "poses", role: "radiogroup", "aria-label": "ท่าทาง" }),
+        h("div", {
+          id: "poses",
+          class: "poses",
+          role: "radiogroup",
+          "aria-label": "ท่าทาง",
+        }),
       ),
     ),
     h(
@@ -724,32 +1086,124 @@ function buildLayout(): void {
       }),
     ),
     h("h2", {}, "กรอบชื่อ"),
-    h("div", { id: "name-frames", class: "frames item-row", role: "radiogroup", "aria-label": "กรอบชื่อ" }, ...skeletons(6, "fx")),
+    h(
+      "div",
+      {
+        id: "name-frames",
+        class: "frames item-row",
+        role: "radiogroup",
+        "aria-label": "กรอบชื่อ",
+      },
+      ...skeletons(6, "fx"),
+    ),
     h("h2", {}, "พื้นหลัง"),
-    h("div", { id: "backgrounds", class: "frames", role: "radiogroup", "aria-label": "พื้นหลัง" }),
+    h("div", {
+      id: "backgrounds",
+      class: "frames",
+      role: "radiogroup",
+      "aria-label": "พื้นหลัง",
+    }),
     h("h2", {}, "กรอบการ์ด"),
-    h("div", { id: "frames", class: "frames", role: "radiogroup", "aria-label": "กรอบการ์ด" }),
+    h("div", {
+      id: "frames",
+      class: "frames",
+      role: "radiogroup",
+      "aria-label": "กรอบการ์ด",
+    }),
     h("h2", {}, "อาชีพ"),
-    h("div", { id: "classes", class: "looks", role: "radiogroup", "aria-label": "อาชีพ" }, ...skeletons(5, "look")),
+    h(
+      "div",
+      {
+        id: "classes",
+        class: "looks",
+        role: "radiogroup",
+        "aria-label": "อาชีพ",
+      },
+      ...skeletons(5, "look"),
+    ),
     h("h2", {}, "ชุดแฟชั่น"),
-    h("div", { id: "fashion", class: "fashion", role: "radiogroup", "aria-label": "ชุดแฟชั่น" }, ...skeletons(2, "look")),
+    h(
+      "div",
+      {
+        id: "fashion",
+        class: "fashion",
+        role: "radiogroup",
+        "aria-label": "ชุดแฟชั่น",
+      },
+      ...skeletons(2, "look"),
+    ),
     dyeTray(LOOK_TRAY),
     h("h2", {}, "ปีก"),
-    h("div", { id: "wings", class: "frames wings", role: "radiogroup", "aria-label": "ปีก", onscroll: () => syncDyes(WING_TRAY) }, ...skeletons(4, "wing")),
+    h(
+      "div",
+      {
+        id: "wings",
+        class: "frames wings",
+        role: "radiogroup",
+        "aria-label": "ปีก",
+        onscroll: () => syncDyes(WING_TRAY),
+      },
+      ...skeletons(4, "wing"),
+    ),
     dyeTray(WING_TRAY),
-    h("p", { id: "wing-error", class: "wing-error", role: "alert", hidden: true }),
-    h("input", { id: "wing-file", type: "file", accept: "image/png,image/webp,image/gif,image/jpeg", hidden: true, onchange: onWingFile }),
+    h("p", {
+      id: "wing-error",
+      class: "wing-error",
+      role: "alert",
+      hidden: true,
+    }),
+    h("input", {
+      id: "wing-file",
+      type: "file",
+      accept: "image/png,image/webp,image/gif,image/jpeg",
+      hidden: true,
+      onchange: onWingFile,
+    }),
     h("h2", {}, "สัตว์ขี่"),
-    h("div", { id: "mounts", class: "frames wings", role: "radiogroup", "aria-label": "สัตว์ขี่" }, ...skeletons(4, "wing")),
-    h("p", { id: "mount-error", class: "wing-error", role: "alert", hidden: true }),
+    h(
+      "div",
+      {
+        id: "mounts",
+        class: "frames wings",
+        role: "radiogroup",
+        "aria-label": "สัตว์ขี่",
+      },
+      ...skeletons(4, "wing"),
+    ),
+    h("p", {
+      id: "mount-error",
+      class: "wing-error",
+      role: "alert",
+      hidden: true,
+    }),
     h("h2", {}, "เครื่องประดับ"),
-    h("div", { id: "accessories", class: "frames item-row", role: "radiogroup", "aria-label": "เครื่องประดับ", onscroll: () => syncDyes(ACCESSORY_TRAY) }),
+    h("div", {
+      id: "accessories",
+      class: "frames item-row",
+      role: "radiogroup",
+      "aria-label": "เครื่องประดับ",
+      onscroll: () => syncDyes(ACCESSORY_TRAY),
+    }),
     dyeTray(ACCESSORY_TRAY),
     h(
       "div",
       { class: "actions" },
-      h("p", { id: "place-error", class: "place-error", role: "alert", hidden: true }),
-      h("button", { type: "button", class: "primary", disabled: true, onclick: () => void placeLook() }, h("span", { class: "primary-label", role: "status" }, PLACE_LABEL)),
+      h("p", {
+        id: "place-error",
+        class: "place-error",
+        role: "alert",
+        hidden: true,
+      }),
+      h(
+        "button",
+        {
+          type: "button",
+          class: "primary",
+          disabled: true,
+          onclick: () => void placeLook(),
+        },
+        h("span", { class: "primary-label", role: "status" }, PLACE_LABEL),
+      ),
     ),
     h("div", { id: "exporter", class: "exporter", "aria-hidden": "true" }),
   );
@@ -784,14 +1238,26 @@ function buildLayout(): void {
 }
 
 /** While the catalog loads, the preview shows the chosen background at its real size with progress over it. */
-function showLoading(progress: { done: number; total: number } | { error: string; title?: string }): void {
+function showLoading(
+  progress: { done: number; total: number } | { error: string; title?: string },
+): void {
   if (!loadingBox) return;
   let art = loadingBox.querySelector<HTMLCanvasElement>("canvas");
   if (!art) {
-    art = h("canvas", { class: "stage-loading-art", width: STAGE_NATIVE.w, height: STAGE_NATIVE.h });
+    art = h("canvas", {
+      class: "stage-loading-art",
+      width: STAGE_NATIVE.w,
+      height: STAGE_NATIVE.h,
+    });
     const paint = (now: number) => {
       if (!loadingBox?.isConnected) return;
-      stageBackdrop(background())(art!.getContext("2d")!, STAGE_NATIVE.w, STAGE_NATIVE.h, STAGE_NATIVE.feet, { ms: now, loopMs: FLAP_PERIOD_MS.idle });
+      stageBackdrop(background())(
+        art!.getContext("2d")!,
+        STAGE_NATIVE.w,
+        STAGE_NATIVE.h,
+        STAGE_NATIVE.feet,
+        { ms: now, loopMs: FLAP_PERIOD_MS.idle },
+      );
       loadingArtFrame = requestAnimationFrame(paint);
     };
     loadingArtFrame = requestAnimationFrame(paint);
@@ -801,16 +1267,35 @@ function showLoading(progress: { done: number; total: number } | { error: string
       ? h(
           "div",
           { class: "stage-loading-panel" },
-          h("p", { class: "stage-loading-title" }, progress.title ?? "โหลดข้อมูลชุดจาก Lumivara ไม่ได้"),
+          h(
+            "p",
+            { class: "stage-loading-title" },
+            progress.title ?? "โหลดข้อมูลชุดจาก Lumivara ไม่ได้",
+          ),
           h("p", { class: "stage-loading-detail" }, progress.error),
-          h("button", { type: "button", class: "retry", onclick: () => void load() }, "ลองอีกครั้ง"),
+          h(
+            "button",
+            { type: "button", class: "retry", onclick: () => void load() },
+            "ลองอีกครั้ง",
+          ),
         )
       : h(
           "div",
           { class: "stage-loading-panel" },
           h("p", { class: "stage-loading-title" }, "กำลังโหลดชุดจาก Lumivara…"),
-          h("div", { class: "boot-bar" }, h("span", { class: "boot-fill", style: `width:${progress.total ? (progress.done / progress.total) * 100 : 0}%` })),
-          h("p", { class: "stage-loading-detail" }, progress.total ? `${progress.done}/${progress.total}` : " "),
+          h(
+            "div",
+            { class: "boot-bar" },
+            h("span", {
+              class: "boot-fill",
+              style: `width:${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
+            }),
+          ),
+          h(
+            "p",
+            { class: "stage-loading-detail" },
+            progress.total ? `${progress.done}/${progress.total}` : " ",
+          ),
         );
   loadingBox.replaceChildren(art, panel);
 }
@@ -834,11 +1319,22 @@ function startStage(): void {
   const fail = (reason: unknown) => {
     if (up || live !== liveStage) return;
     stopWatching();
-    showLoading({ error: bootErrorText(reason), title: "เปิดตัวอย่างตัวละครไม่ได้" });
+    showLoading({
+      error: bootErrorText(reason),
+      title: "เปิดตัวอย่างตัวละครไม่ได้",
+    });
   };
-  const onError = (e: ErrorEvent) => setTimeout(() => fail(e.error ?? e.message), BOOT_ERROR_GRACE_MS);
-  const onRejection = (e: PromiseRejectionEvent) => setTimeout(() => fail(e.reason), BOOT_ERROR_GRACE_MS);
-  const watchdog = setTimeout(() => fail(`ตัวอย่างไม่ขึ้นภายใน ${STAGE_BOOT_MS / 1000} วินาที ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วลองอีกครั้ง`), STAGE_BOOT_MS);
+  const onError = (e: ErrorEvent) =>
+    setTimeout(() => fail(e.error ?? e.message), BOOT_ERROR_GRACE_MS);
+  const onRejection = (e: PromiseRejectionEvent) =>
+    setTimeout(() => fail(e.reason), BOOT_ERROR_GRACE_MS);
+  const watchdog = setTimeout(
+    () =>
+      fail(
+        `ตัวอย่างไม่ขึ้นภายใน ${STAGE_BOOT_MS / 1000} วินาที ลองปิดบอร์ดหรือแท็บอื่นที่เปิดค้างไว้ แล้วลองอีกครั้ง`,
+      ),
+    STAGE_BOOT_MS,
+  );
   function stopWatching(): void {
     clearTimeout(watchdog);
     removeEventListener("error", onError);
@@ -893,7 +1389,15 @@ function renderWings(): void {
           title: w.description,
           onclick: () => setWings(w.id),
         },
-        w.icon && h("img", { crossOrigin: "anonymous", src: w.icon, alt: "", width: 36, height: 36, "data-icon": w.icon }),
+        w.icon &&
+          h("img", {
+            crossOrigin: "anonymous",
+            src: w.icon,
+            alt: "",
+            width: 36,
+            height: 36,
+            "data-icon": w.icon,
+          }),
         h("span", {}, w.name),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
         w.id.startsWith("own-") && ownMark(),
@@ -912,7 +1416,15 @@ function renderWings(): void {
           ondragover: (e: DragEvent) => e.preventDefault(),
           ondrop: (e: DragEvent) => dropWing(e, saved.id),
         },
-        icon ? h("img", { src: icon, alt: "", width: 36, height: 36, "data-icon": icon }) : h("span", { class: "wing-plus", "aria-hidden": "true" }, "…"),
+        icon
+          ? h("img", {
+              src: icon,
+              alt: "",
+              width: 36,
+              height: 36,
+              "data-icon": icon,
+            })
+          : h("span", { class: "wing-plus", "aria-hidden": "true" }, "…"),
         h("span", {}, ownWingName(saved.id)),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
       );
@@ -940,13 +1452,36 @@ function setWings(id: string | null): void {
 
 function renderMounts(): void {
   document.getElementById("mounts")!.replaceChildren(
-    h("button", { type: "button", class: "wing", "data-mount": "", onclick: () => void setMount(null) }, h("span", { class: "none" }, "ไม่ขี่")),
+    h(
+      "button",
+      {
+        type: "button",
+        class: "wing",
+        "data-mount": "",
+        onclick: () => void setMount(null),
+      },
+      h("span", { class: "none" }, "ไม่ขี่"),
+    ),
     ...MOUNTS.map((m) =>
       h(
         "button",
-        { type: "button", class: "wing", "data-mount": m.id, title: m.description, onclick: () => void setMount(m.id) },
+        {
+          type: "button",
+          class: "wing",
+          "data-mount": m.id,
+          title: m.description,
+          onclick: () => void setMount(m.id),
+        },
         // A drawn mount's tile is its whole first frame, smoothed down to the tile.
-        m.icon && h("img", { crossOrigin: "anonymous", src: m.icon, alt: "", width: 36, height: 36, class: m.icon.startsWith("data:") ? "smooth" : undefined }),
+        m.icon &&
+          h("img", {
+            crossOrigin: "anonymous",
+            src: m.icon,
+            alt: "",
+            width: 36,
+            height: 36,
+            class: m.icon.startsWith("data:") ? "smooth" : undefined,
+          }),
         h("span", {}, m.name),
         m.id.startsWith("own-") && ownMark(),
       ),
@@ -988,7 +1523,9 @@ async function setMount(id: string | null): Promise<void> {
   } catch (err) {
     if (mountPicked !== mount.id) return;
     mountPicked = mountId;
-    showMountError(`โหลด ${mount.name} จาก Lumivara ไม่ได้ (${errorText(err)})`);
+    showMountError(
+      `โหลด ${mount.name} จาก Lumivara ไม่ได้ (${errorText(err)})`,
+    );
   }
   renderChoices();
 }
@@ -1016,15 +1553,26 @@ function dropWing(event: DragEvent, id: string | null): void {
   void takeWingFile(event.dataTransfer?.files[0], id);
 }
 
-
-async function takeWingFile(file: File | undefined, id: string | null): Promise<void> {
+async function takeWingFile(
+  file: File | undefined,
+  id: string | null,
+): Promise<void> {
   if (!file || !live) return;
-  if (!file.type.startsWith("image/")) return showWingError("ใช้ไฟล์รูปภาพ เช่น PNG หรือ JPG");
+  if (!file.type.startsWith("image/"))
+    return showWingError("ใช้ไฟล์รูปภาพ เช่น PNG หรือ JPG");
   const old = savedWingOf(id);
-  if (!old && savedWings.length >= MAX_OWN_WINGS) return showWingError(`เก็บปีกของคุณได้ ${MAX_OWN_WINGS} แบบ เอาปีกที่ไม่ใช้ออกก่อน`);
+  if (!old && savedWings.length >= MAX_OWN_WINGS)
+    return showWingError(
+      `เก็บปีกของคุณได้ ${MAX_OWN_WINGS} แบบ เอาปีกที่ไม่ใช้ออกก่อน`,
+    );
   try {
     const png = await readWing(file);
-    await wearWing(old ? { ...old, png, flip: false } : { id: newUploadId(), png, aura: "gold", size: "m", flip: false }, { wear: true, save: true });
+    await wearWing(
+      old
+        ? { ...old, png, flip: false }
+        : { id: newUploadId(), png, aura: "gold", size: "m", flip: false },
+      { wear: true, save: true },
+    );
   } catch (err) {
     showWingError(errorText(err));
   }
@@ -1033,7 +1581,10 @@ async function takeWingFile(file: File | undefined, id: string | null): Promise<
 const sendWings = () => send({ type: "save-wings", wings: savedWings });
 
 /** Builds one of the player's wings and gives it to the game's wing code; only its latest change is kept. */
-async function wearWing(saved: SavedWing, then: { wear: boolean; save: boolean }): Promise<void> {
+async function wearWing(
+  saved: SavedWing,
+  then: { wear: boolean; save: boolean },
+): Promise<void> {
   const version = ++wingVersion;
   latestBuild.set(saved.id, version);
   showWingError(null);
@@ -1053,7 +1604,10 @@ async function wearWing(saved: SavedWing, then: { wear: boolean; save: boolean }
 
 function changeWing(change: Partial<SavedWing>): void {
   const saved = savedWingOf(wingsId);
-  if (saved) wearWing({ ...saved, ...change }, { wear: true, save: true }).catch((err) => showWingError(errorText(err)));
+  if (saved)
+    wearWing({ ...saved, ...change }, { wear: true, save: true }).catch((err) =>
+      showWingError(errorText(err)),
+    );
 }
 
 function removeWing(): void {
@@ -1073,12 +1627,17 @@ function removeWing(): void {
 function restoreWings(wings: SavedWing[]): void {
   savedWings = wings.slice(0, MAX_OWN_WINGS);
   renderWings();
-  for (const saved of savedWings) wearWing(saved, { wear: false, save: false }).catch(() => {});
+  for (const saved of savedWings)
+    wearWing(saved, { wear: false, save: false }).catch(() => {});
 }
 
 // Built once, inside the wing tray, for the player's own wing.
 function wingTools(): HTMLElement {
-  const tool = (label: string, attrs: Record<string, unknown>, onclick: () => void) => h("button", { type: "button", class: "pose", ...attrs, onclick }, label);
+  const tool = (
+    label: string,
+    attrs: Record<string, unknown>,
+    onclick: () => void,
+  ) => h("button", { type: "button", class: "pose", ...attrs, onclick }, label);
   return h(
     "div",
     { id: "wing-tools", class: "wing-tools", hidden: true },
@@ -1086,12 +1645,34 @@ function wingTools(): HTMLElement {
       "div",
       { class: "wing-tool-row" },
       tool("เปลี่ยนรูป", {}, () => pickWingFile(wingsId)),
-      tool("กลับด้าน", { role: "switch", "data-wing-flip": "" }, () => changeWing({ flip: !savedWingOf(wingsId)?.flip })),
+      tool("กลับด้าน", { role: "switch", "data-wing-flip": "" }, () =>
+        changeWing({ flip: !savedWingOf(wingsId)?.flip }),
+      ),
       tool("เอาออก", {}, removeWing),
     ),
-    h("div", { class: "wing-tool-row", role: "radiogroup", "aria-label": "ขนาดปีก" }, ...WING_SIZES.map((s) => tool(s.name, { role: "radio", "data-wing-size": s.id }, () => changeWing({ size: s.id })))),
-    h("div", { class: "wing-tool-row", role: "radiogroup", "aria-label": "แสงของปีก" }, ...WING_AURAS.map((a) => tool(a.name, { role: "radio", "data-wing-aura": a.id }, () => changeWing({ aura: a.id })))),
-    h("p", { class: "wing-tool-hint" }, "ใช้รูปปีกข้างเดียวที่กางไปทางขวา โคนปีกอยู่ซ้าย พื้นหลังโปร่งใสหรือสีเรียบ"),
+    h(
+      "div",
+      { class: "wing-tool-row", role: "radiogroup", "aria-label": "ขนาดปีก" },
+      ...WING_SIZES.map((s) =>
+        tool(s.name, { role: "radio", "data-wing-size": s.id }, () =>
+          changeWing({ size: s.id }),
+        ),
+      ),
+    ),
+    h(
+      "div",
+      { class: "wing-tool-row", role: "radiogroup", "aria-label": "แสงของปีก" },
+      ...WING_AURAS.map((a) =>
+        tool(a.name, { role: "radio", "data-wing-aura": a.id }, () =>
+          changeWing({ aura: a.id }),
+        ),
+      ),
+    ),
+    h(
+      "p",
+      { class: "wing-tool-hint" },
+      "ใช้รูปปีกข้างเดียวที่กางไปทางขวา โคนปีกอยู่ซ้าย พื้นหลังโปร่งใสหรือสีเรียบ",
+    ),
   );
 }
 
@@ -1100,9 +1681,25 @@ function syncWingTools(): void {
   if (!tools) return;
   const saved = savedWingOf(wingsId);
   tools.hidden = !saved;
-  tools.querySelectorAll<HTMLElement>("[data-wing-size]").forEach((n) => n.setAttribute("aria-checked", String(n.dataset.wingSize === saved?.size)));
-  tools.querySelectorAll<HTMLElement>("[data-wing-aura]").forEach((n) => n.setAttribute("aria-checked", String(n.dataset.wingAura === saved?.aura)));
-  tools.querySelector("[data-wing-flip]")?.setAttribute("aria-checked", String(!!saved?.flip));
+  tools
+    .querySelectorAll<HTMLElement>("[data-wing-size]")
+    .forEach((n) =>
+      n.setAttribute(
+        "aria-checked",
+        String(n.dataset.wingSize === saved?.size),
+      ),
+    );
+  tools
+    .querySelectorAll<HTMLElement>("[data-wing-aura]")
+    .forEach((n) =>
+      n.setAttribute(
+        "aria-checked",
+        String(n.dataset.wingAura === saved?.aura),
+      ),
+    );
+  tools
+    .querySelector("[data-wing-flip]")
+    ?.setAttribute("aria-checked", String(!!saved?.flip));
 }
 
 const iconDyes = new Map<string, Promise<string>>();
@@ -1112,7 +1709,10 @@ function dyedIcon(url: string, hex: string): Promise<string> {
   let made = iconDyes.get(key);
   if (!made) {
     made = loadImage(url).then((image) => {
-      const canvas = h("canvas", { width: image.naturalWidth, height: image.naturalHeight });
+      const canvas = h("canvas", {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(image, 0, 0);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -1169,12 +1769,20 @@ type DyeTray = {
 
 const WING_TRAY: DyeTray = {
   tray: "wing-tray",
-  rows: () => [{ id: "wing-dyes", label: "สีปีก", current: wingDye, set: setWingDye }],
-  tile: () => (wingsId ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`) : null),
+  rows: () => [
+    { id: "wing-dyes", label: "สีปีก", current: wingDye, set: setWingDye },
+  ],
+  tile: () =>
+    wingsId
+      ? document.querySelector<HTMLElement>(`[data-wings="${wingsId}"]`)
+      : null,
   title: () => (wingsId ? `สีของ ${wingName(wingsId)}` : null),
 };
 
-const hexOf = (c: Hsl) => `#${hslToRgb(c).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+const hexOf = (c: Hsl) =>
+  `#${hslToRgb(c)
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
 
 const LOOK_TRAY: DyeTray = {
   tray: "look-tray",
@@ -1186,15 +1794,34 @@ const LOOK_TRAY: DyeTray = {
       current: () => lookDyesOf(dyeKey(look()))[k] ?? null,
       set: (hex) => setLookDye(k, hex),
     })),
-  tile: () => (catalog ? document.querySelector<HTMLElement>(`[data-look="${dyeKey(look())}"]`) : null),
-  title: () => (lookParts().length ? `สีของ ${outfitId ? look().name : (skin()?.name ?? "ชุดปกติ")}` : null),
+  tile: () =>
+    catalog
+      ? document.querySelector<HTMLElement>(`[data-look="${dyeKey(look())}"]`)
+      : null,
+  title: () =>
+    lookParts().length
+      ? `สีของ ${outfitId ? look().name : (skin()?.name ?? "ชุดปกติ")}`
+      : null,
 };
 
 const ACCESSORY_TRAY: DyeTray = {
   tray: "accessory-tray",
-  rows: () => [{ id: "accessory-dyes", label: "สีเครื่องประดับ", current: accessoryDye, set: setAccessoryDye }],
-  tile: () => (accessoryId ? document.querySelector<HTMLElement>(`[data-accessory="${accessoryId}"]`) : null),
-  title: () => (accessoryId ? `สีของ ${ACCESSORIES.find((a) => a.id === accessoryId)?.name ?? "เครื่องประดับ"}` : null),
+  rows: () => [
+    {
+      id: "accessory-dyes",
+      label: "สีเครื่องประดับ",
+      current: accessoryDye,
+      set: setAccessoryDye,
+    },
+  ],
+  tile: () =>
+    accessoryId
+      ? document.querySelector<HTMLElement>(`[data-accessory="${accessoryId}"]`)
+      : null,
+  title: () =>
+    accessoryId
+      ? `สีของ ${ACCESSORIES.find((a) => a.id === accessoryId)?.name ?? "เครื่องประดับ"}`
+      : null,
 };
 
 // The caret stays this far inside the tray when its tile is scrolled out of view.
@@ -1212,25 +1839,66 @@ const swatchRow = (row: Swatches) =>
   h(
     "div",
     { class: "dye-part" },
-    row.part && h("p", { class: "dye-part-name" }, h("i", { class: "dye-part-chip", style: `background:${row.part}`, "aria-hidden": "true" }), row.label),
+    row.part &&
+      h(
+        "p",
+        { class: "dye-part-name" },
+        h("i", {
+          class: "dye-part-chip",
+          style: `background:${row.part}`,
+          "aria-hidden": "true",
+        }),
+        row.label,
+      ),
     h(
       "div",
-      { id: row.id, class: "swatches", role: "radiogroup", "aria-label": row.label },
-      h("button", { type: "button", class: "swatch swatch-none", title: "สีเดิม", "aria-label": "สีเดิม", "data-dye": "", onclick: () => row.set(null) }),
+      {
+        id: row.id,
+        class: "swatches",
+        role: "radiogroup",
+        "aria-label": row.label,
+      },
+      h("button", {
+        type: "button",
+        class: "swatch swatch-none",
+        title: "สีเดิม",
+        "aria-label": "สีเดิม",
+        "data-dye": "",
+        onclick: () => row.set(null),
+      }),
       ...DYES.map((d) =>
-        h("button", { type: "button", class: "swatch", title: d.name, "aria-label": d.name, "data-dye": d.hex, style: `background:${d.hex}`, onclick: () => row.set(d.hex) }),
+        h("button", {
+          type: "button",
+          class: "swatch",
+          title: d.name,
+          "aria-label": d.name,
+          "data-dye": d.hex,
+          style: `background:${d.hex}`,
+          onclick: () => row.set(d.hex),
+        }),
       ),
       h(
         "label",
-        { class: "swatch swatch-custom", title: "เลือกสีเอง", "data-dye": "custom" },
-        h("input", { type: "color", value: CUSTOM_DYE, "aria-label": "เลือกสีเอง", oninput: (e: Event) => row.set((e.target as HTMLInputElement).value) }),
+        {
+          class: "swatch swatch-custom",
+          title: "เลือกสีเอง",
+          "data-dye": "custom",
+        },
+        h("input", {
+          type: "color",
+          value: CUSTOM_DYE,
+          "aria-label": "เลือกสีเอง",
+          oninput: (e: Event) => row.set((e.target as HTMLInputElement).value),
+        }),
       ),
     ),
   );
 
 // Built only when its rows change: re-rendering would close the colour picker while it is being dragged.
 function renderDyes(t: DyeTray): void {
-  document.querySelector(`#${t.tray} .dye-rows`)?.replaceChildren(...t.rows().map(swatchRow));
+  document
+    .querySelector(`#${t.tray} .dye-rows`)
+    ?.replaceChildren(...t.rows().map(swatchRow));
   syncDyes(t);
 }
 
@@ -1239,11 +1907,14 @@ function syncDyes(t: DyeTray): void {
   for (const row of t.rows()) {
     const dye = row.current();
     const custom = dye !== null && !DYES.some((d) => d.hex === dye);
-    document.querySelectorAll<HTMLElement>(`#${row.id} [data-dye]`).forEach((n) => {
-      const pressed = n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === dye;
-      n.setAttribute("aria-pressed", String(pressed));
-      if (n.dataset.dye === "custom") n.style.background = custom ? dye! : "";
-    });
+    document
+      .querySelectorAll<HTMLElement>(`#${row.id} [data-dye]`)
+      .forEach((n) => {
+        const pressed =
+          n.dataset.dye === "custom" ? custom : (n.dataset.dye || null) === dye;
+        n.setAttribute("aria-pressed", String(pressed));
+        if (n.dataset.dye === "custom") n.style.background = custom ? dye! : "";
+      });
   }
   const tray = document.getElementById(t.tray);
   if (!tray) return;
@@ -1253,7 +1924,10 @@ function syncDyes(t: DyeTray): void {
   if (!title || !tile) return;
   const box = tray.getBoundingClientRect();
   const at = tile.getBoundingClientRect();
-  tray.style.setProperty("--caret-x", `${Math.min(box.width - CARET_INSET, Math.max(CARET_INSET, at.left + at.width / 2 - box.left))}px`);
+  tray.style.setProperty(
+    "--caret-x",
+    `${Math.min(box.width - CARET_INSET, Math.max(CARET_INSET, at.left + at.width / 2 - box.left))}px`,
+  );
   tray.querySelector(".dye-tray-title")!.textContent = title;
 }
 
@@ -1285,7 +1959,11 @@ function setLookDye(part: number, hex: string | null): void {
   const key = dyeKey(look());
   const dyes = [...lookDyesOf(key)];
   dyes[part] = hex;
-  if (dyes.some(Boolean)) lookDyes.set(key, Array.from(dyes, (d) => d ?? null));
+  if (dyes.some(Boolean))
+    lookDyes.set(
+      key,
+      Array.from(dyes, (d) => d ?? null),
+    );
   else lookDyes.delete(key);
   syncLookDyes();
 }
@@ -1297,11 +1975,13 @@ function setWingDye(hex: string | null): void {
   syncWingDyes();
 }
 
-
 const ACCESSORY_THUMB = { size: 36, headW: 16 };
 
 // The accessory alone, cropped to its pixels and scaled up by whole pixels.
-function accessoryThumb(accessory: Accessory, dye: string | null = null): HTMLCanvasElement {
+function accessoryThumb(
+  accessory: Accessory,
+  dye: string | null = null,
+): HTMLCanvasElement {
   const px = pixels(ACCESSORY_ART.w, ACCESSORY_ART.h);
   accessory.paint(px, ACCESSORY_THUMB.headW, 1);
   if (dye) dyeShades(px.data, accessory.body, hexToHsl(dye));
@@ -1309,17 +1989,39 @@ function accessoryThumb(accessory: Accessory, dye: string | null = null): HTMLCa
   for (let y = 0; y < px.h; y++) {
     for (let x = 0; x < px.w; x++) {
       if (!px.data[(y * px.w + x) * 4 + 3]) continue;
-      [left, top, right, bottom] = [Math.min(left, x), Math.min(top, y), Math.max(right, x), Math.max(bottom, y)];
+      [left, top, right, bottom] = [
+        Math.min(left, x),
+        Math.min(top, y),
+        Math.max(right, x),
+        Math.max(bottom, y),
+      ];
     }
   }
   const art = h("canvas", { width: px.w, height: px.h });
   art.getContext("2d")!.putImageData(new ImageData(px.data, px.w, px.h), 0, 0);
   const [cw, ch] = [right - left + 1, bottom - top + 1];
-  const scale = Math.max(1, Math.floor(ACCESSORY_THUMB.size / Math.max(cw, ch)));
-  const thumb = h("canvas", { width: ACCESSORY_THUMB.size, height: ACCESSORY_THUMB.size, class: "acc-thumb" });
+  const scale = Math.max(
+    1,
+    Math.floor(ACCESSORY_THUMB.size / Math.max(cw, ch)),
+  );
+  const thumb = h("canvas", {
+    width: ACCESSORY_THUMB.size,
+    height: ACCESSORY_THUMB.size,
+    class: "acc-thumb",
+  });
   const ctx = thumb.getContext("2d")!;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(art, left, top, cw, ch, Math.floor((ACCESSORY_THUMB.size - cw * scale) / 2), Math.floor((ACCESSORY_THUMB.size - ch * scale) / 2), cw * scale, ch * scale);
+  ctx.drawImage(
+    art,
+    left,
+    top,
+    cw,
+    ch,
+    Math.floor((ACCESSORY_THUMB.size - cw * scale) / 2),
+    Math.floor((ACCESSORY_THUMB.size - ch * scale) / 2),
+    cw * scale,
+    ch * scale,
+  );
   return thumb;
 }
 
@@ -1327,14 +2029,25 @@ function renderAccessories(): void {
   document.getElementById("accessories")!.replaceChildren(
     h(
       "button",
-      { type: "button", class: "fx", "data-accessory": "", onclick: () => setAccessory(null) },
+      {
+        type: "button",
+        class: "fx",
+        "data-accessory": "",
+        onclick: () => setAccessory(null),
+      },
       h("span", { class: "fx-none", "aria-hidden": "true" }),
       h("span", {}, "ไม่ใส่"),
     ),
     ...ACCESSORIES.map((a) =>
       h(
         "button",
-        { type: "button", class: "fx", "data-accessory": a.id, "data-dyed": "", onclick: () => setAccessory(a.id) },
+        {
+          type: "button",
+          class: "fx",
+          "data-accessory": a.id,
+          "data-dyed": "",
+          onclick: () => setAccessory(a.id),
+        },
         accessoryThumb(a),
         h("span", {}, a.name),
         h("i", { class: "dye-chip", "aria-hidden": "true", hidden: true }),
@@ -1347,12 +2060,17 @@ function renderAccessories(): void {
 /** Marks the chosen accessory and shows each in the colour it was given. */
 function syncAccessories(): void {
   document.querySelectorAll<HTMLElement>("[data-accessory]").forEach((n) => {
-    n.setAttribute("aria-pressed", String((n.dataset.accessory || null) === accessoryId));
+    n.setAttribute(
+      "aria-pressed",
+      String((n.dataset.accessory || null) === accessoryId),
+    );
     const accessory = ACCESSORIES.find((a) => a.id === n.dataset.accessory);
     const dye = accessory ? (accessoryDyes.get(accessory.id) ?? "") : "";
     if (!accessory || n.dataset.dyed === dye) return;
     n.dataset.dyed = dye;
-    n.querySelector(".acc-thumb")?.replaceWith(accessoryThumb(accessory, dye || null));
+    n.querySelector(".acc-thumb")?.replaceWith(
+      accessoryThumb(accessory, dye || null),
+    );
     const chip = n.querySelector<HTMLElement>(".dye-chip")!;
     chip.hidden = !dye;
     chip.style.background = dye;
@@ -1382,15 +2100,34 @@ function renderNameFrames(): void {
   document.getElementById("name-frames")!.replaceChildren(
     h(
       "button",
-      { type: "button", class: "fx", "data-name-frame": "", onclick: () => setNameFrame(null) },
+      {
+        type: "button",
+        class: "fx",
+        "data-name-frame": "",
+        onclick: () => setNameFrame(null),
+      },
       h("span", { class: "fx-none", "aria-hidden": "true" }),
       h("span", {}, "ไม่ใส่"),
     ),
     ...NAME_FRAMES.map((f) =>
       h(
         "button",
-        { type: "button", class: "fx", "data-name-frame": f.id, title: f.description, onclick: () => setNameFrame(f.id) },
-        f.icon ? h("img", { crossOrigin: "anonymous", src: f.icon, alt: "", width: 36, height: 36 }) : h("span", { class: "fx-none", "aria-hidden": "true" }),
+        {
+          type: "button",
+          class: "fx",
+          "data-name-frame": f.id,
+          title: f.description,
+          onclick: () => setNameFrame(f.id),
+        },
+        f.icon
+          ? h("img", {
+              crossOrigin: "anonymous",
+              src: f.icon,
+              alt: "",
+              width: 36,
+              height: 36,
+            })
+          : h("span", { class: "fx-none", "aria-hidden": "true" }),
         h("span", {}, f.name),
       ),
     ),
@@ -1409,7 +2146,9 @@ async function load(): Promise<void> {
   resetStages();
   showLoading({ done: 0, total: 0 });
   try {
-    catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) => showLoading({ done, total }));
+    catalog = await loadCatalog(CODE_WING_STYLES, DIRECTIONS, (done, total) =>
+      showLoading({ done, total }),
+    );
   } catch (err) {
     showLoading({ error: errorText(err) });
     return;
@@ -1423,7 +2162,10 @@ async function load(): Promise<void> {
 
 function openRoom(): void {
   const own = drawnWings();
-  useWingStyles({ ...catalog.styles, ...Object.fromEntries(own.map((w) => [w.id, w.style])) });
+  useWingStyles({
+    ...catalog.styles,
+    ...Object.fromEntries(own.map((w) => [w.id, w.style])),
+  });
   Object.assign(catalog.wingTextures, ...own.map((w) => w.textures));
   CLASS_LOOKS = catalog.looks.filter((l) => l.kind === "class");
   OUTFITS = catalog.looks.filter((l) => l.kind === "outfit");
@@ -1454,7 +2196,9 @@ api.onMessage((raw) => {
       if (live) restoreWings(message.wings);
       else pendingWings = message.wings;
     }
-    const input = document.getElementById("name-input") as HTMLInputElement | null;
+    const input = document.getElementById(
+      "name-input",
+    ) as HTMLInputElement | null;
     if (!message.name || (input ? input.value : playerName)) return;
     playerName = cleanName(message.name);
     if (input) {
