@@ -10,7 +10,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const UPSTREAM = "https://lumivaraonline.com";
-const ART = /^(\/[\w-][\w.-]*)+\.(png|json)$/;
+const ART = /^(\/[\w-][\w.-]*)+\.(png|webp|json)$/;
 const KEPT = ["/_headers", "/cosmetics.json"];
 const PARALLEL = 8;
 
@@ -21,7 +21,7 @@ export type Synced = {
   missing: string[];
 };
 
-/** Every same-site .png or .json path cosmetics.json mentions, wherever in the file it sits. */
+/** Every same-site .png, .webp or .json path cosmetics.json mentions, wherever in the file it sits. */
 export function artPaths(cosmetics: unknown): string[] {
   const found = new Set<string>();
   const visit = (v: unknown): void => {

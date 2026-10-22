@@ -14,6 +14,13 @@ const COSMETICS = {
       id: "novice",
       atlas: { png: "/novice-v6/player.png", json: "/novice-v6/player.json" },
     },
+    {
+      id: "swordsman",
+      atlas: {
+        png: "/jobs/crimson-swordsman-v1/player.webp",
+        json: "/jobs/crimson-swordsman-v1/player.json",
+      },
+    },
   ],
   skins: [
     {
@@ -79,6 +86,8 @@ async function put(dir: string, path: string, text: string) {
 test("finds every file cosmetics.json mentions, wherever it sits, and nothing off the site", () => {
   assert.deepEqual(FILES, [
     "/items/demon_wings.png",
+    "/jobs/crimson-swordsman-v1/player.json",
+    "/jobs/crimson-swordsman-v1/player.webp",
     "/mounts/meadow_pegasus.png",
     "/name-frames/star-gem.png",
     "/name-frames/star.png",
