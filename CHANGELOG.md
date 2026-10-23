@@ -1,15 +1,20 @@
 # Changelog
 
-## 1.5.0
+## 1.6.0
 
-- ชุด ภาพตัวละคร ปีก สัตว์ขี่ และกรอบชื่อจากเกมโหลดผ่านเซิร์ฟเวอร์ของห้องแต่งตัว หลัง Lumivara ปิดไม่ให้เว็บอื่นใช้ภาพ และสัตว์ขี่จากเกมขี่ได้แล้ว · the game's outfits, characters, wings, mounts and name frames load through the fitting room's own server now that Lumivara keeps other sites from using its images, and the game's mounts can be ridden
-- สัตว์ขี่: ขี่ Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox หรือ Frostveil Skystag จากเกม ตัวละครนั่งบนหลังและปีกลดต่ำลงเหมือนในเกม หมุนดูได้รอบตัว วางเป็นการ์ดที่ขยับได้ และสัตว์ขี่ใหม่ในเกมขึ้นเองโดยไม่ต้องอัปเดต · mounts: ride the game's Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox or Frostveil Skystag, seated with lowered wings as in the game, all the way round and on an animated card, with new mounts showing up on their own
-- สัตว์ขี่ของห้องแต่งตัว 8 ตัว: Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi และ Aurora Jelly วาดเป็นพิกเซลอาร์ตแบบสัตว์ขี่ในเกม ขยับได้ทุกทิศ · 8 mounts of the fitting room's own: the Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi and Aurora Jelly, pixel art like the game's mounts, moving in every direction
 - สกินของห้องแต่งตัว 60 แบบ อาชีพละ 6 แบบ เช่น Olive Greenhorn, Cobalt Vanguard, Wisteria Viper และ Pine Ronin เป็นชุดปกติของอาชีพในโทนสีใหม่ ชุดสีเทาอย่างของ Kensei ก็เปลี่ยนสีได้ และเปลี่ยนสีต่อได้ทีละส่วน · 60 skins of the fitting room's own, six for every class, from the Olive Greenhorn and Cobalt Vanguard to the Wisteria Viper and Pine Ronin: a class's plain look in new colours, grey clothes like the Kensei's included, each part still dyeable
 - สกิน ปีก และสัตว์ขี่ของห้องแต่งตัวมี ✦ เล็ก ๆ ที่มุม บอกว่าไม่มีในเกม · the fitting room's own skins, wings and mounts carry a small ✦ in the corner, so they are told from the game's
 - สัตว์ขี่ของห้องแต่งตัวเพิ่ม 8 ตัว: Sun Lion, Shadow Panther, Mushroom Snail, Bamboo Panda, Clockwork Steed, Cloud Whale, Thunder Ram และ Coral Seahorse · 8 more mounts of the fitting room's own: the Sun Lion, Shadow Panther, Mushroom Snail, Bamboo Panda, Clockwork Steed, Cloud Whale, Thunder Ram and Coral Seahorse
 - ปีกเพิ่ม 10 แบบ: Seraph, Bat, Peacock, Stained Glass, Amethyst, Thundercloud, Koi Fin, Spectral, Candy และ Silk Ribbon Wings · 10 more wings: Seraph, Bat, Peacock, Stained Glass, Amethyst, Thundercloud, Koi Fin, Spectral, Candy and Silk Ribbon Wings
 - พื้นหลังเคลื่อนไหวเพิ่ม 10 แบบ: ชายหาดยามเย็น ใบไม้ร่วง สุสานผีสิง เมืองนีออน เทศกาลโคมลอย ป่าไผ่ ฟ้าสายรุ้ง เนบิวลา ดินแดนขนม และน้ำตก · 10 more animated backgrounds: sunset beach, autumn leaves, graveyard, neon city, lantern festival, bamboo grove, rainbow sky, nebula, candy land and waterfall
+- ช่องเลือกแต่ละแถวพอดีกับความกว้างของแผง ขอบเท่ากันทุกด้าน และปุ่มด้านล่างไม่บังรายการ · each row of tiles fits the panel's width with an even inset, and the footer no longer covers the list
+- ถ้าโหลดไม่สำเร็จ แผงจะบอกเป็นภาษาไทยพร้อมปุ่มลองใหม่ ไม่แสดงข้อความผิดพลาดภาษาอังกฤษ · if loading fails, the panel says so in Thai with a retry button, without the raw English error
+
+## 1.5.0
+
+- ชุด ภาพตัวละคร ปีก สัตว์ขี่ และกรอบชื่อจากเกมโหลดผ่านเซิร์ฟเวอร์ของห้องแต่งตัว หลัง Lumivara ปิดไม่ให้เว็บอื่นใช้ภาพ และสัตว์ขี่จากเกมขี่ได้แล้ว · the game's outfits, characters, wings, mounts and name frames load through the fitting room's own server now that Lumivara keeps other sites from using its images, and the game's mounts can be ridden
+- สัตว์ขี่: ขี่ Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox หรือ Frostveil Skystag จากเกม ตัวละครนั่งบนหลังและปีกลดต่ำลงเหมือนในเกม หมุนดูได้รอบตัว วางเป็นการ์ดที่ขยับได้ และสัตว์ขี่ใหม่ในเกมขึ้นเองโดยไม่ต้องอัปเดต · mounts: ride the game's Meadow Pegasus, Moonlit Skywolf, Sakura Cloud Fox or Frostveil Skystag, seated with lowered wings as in the game, all the way round and on an animated card, with new mounts showing up on their own
+- สัตว์ขี่ของห้องแต่งตัว 8 ตัว: Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi และ Aurora Jelly วาดเป็นพิกเซลอาร์ตแบบสัตว์ขี่ในเกม ขยับได้ทุกทิศ · 8 mounts of the fitting room's own: the Ember Drake, Tide Manta, Storm Griffin, Moon Moth, Crystal Tortoise, Sand Scarab, Sakura Koi and Aurora Jelly, pixel art like the game's mounts, moving in every direction
 - Wrathflame Wings ลุกเป็นไฟและมีสะเก็ดไฟลอยขึ้นเหมือนในเกม · Wrathflame Wings flicker with the game's fire and rising embers
 - Soulreaper Scythes มีประกายและวิญญาณลอยรอบเคียวเหมือนในเกม · Soulreaper Scythes shimmer with the game's twinkles and drifting souls
 
